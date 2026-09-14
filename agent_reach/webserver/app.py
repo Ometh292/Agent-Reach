@@ -24,6 +24,7 @@ Or:
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -43,7 +44,14 @@ def _load_dotenv_if_present() -> None:
     Render and other hosts set real environment variables, where no .env file
     exists and this does nothing — so local and production read configuration
     through exactly the same path. Existing variables always win.
+
+    Skipped under pytest. This mutates the process environment at import time,
+    and a developer's local .env then leaks into unrelated tests: a real
+    GROQ_API_KEY on disk made six transcription and installer tests believe a
+    provider was configured when they required none.
     """
+    if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
     try:
         from dotenv import load_dotenv
     except ImportError:                              # pragma: no cover
