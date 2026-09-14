@@ -7,9 +7,21 @@ from agent_reach.channels import get_all_channels
 from agent_reach.config import Config
 
 
+def _fresh_ytdlp_version() -> str:
+    """A yt-dlp calendar version that is current as of right now.
+
+    Hard-coding a release date made this fixture a time bomb: YouTubeChannel
+    warns about stale yt-dlp builds, so any frozen version eventually flips
+    every "ok" assertion in this module to "warn" with no code change.
+    """
+    import datetime
+
+    return datetime.date.today().strftime("%Y.%m.%d")
+
+
 def _fake_run_ok(cmd, **kwargs):
-    """Pretend any probed CLI executes fine and prints a version."""
-    return subprocess.CompletedProcess(cmd, 0, "2026.06.09", "")
+    """Pretend any probed CLI executes fine and prints a current version."""
+    return subprocess.CompletedProcess(cmd, 0, _fresh_ytdlp_version(), "")
 
 
 def test_channel_registry_contract():
