@@ -162,24 +162,48 @@ def test_check_prescribes_js_runtimes_from_first_supported_stable_release():
     assert ch.active_backend == "yt-dlp"
 
 
-def test_constraints_pin_ytdlp_to_current_stable_release():
-    constraints = Path(__file__).parents[1] / "constraints.txt"
-    pin = next(
-        line
-        for line in constraints.read_text(encoding="utf-8").splitlines()
-        if line.startswith("yt-dlp==")
-    )
+def test_constraints_must_not_freeze_ytdlp_to_an_exact_release():
+    """yt-dlp must float here, unlike every other constrained dependency.
 
-    assert pin == "yt-dlp==2026.07.04"
+    A hard pin buys no reproducibility for this package: YouTube ships
+    extractor-breaking changes continuously and tracking them is the whole
+    point of yt-dlp, so an exact pin only guarantees that the documented
+    `pip install -c constraints.txt` install eventually lands on a build that
+    cannot read YouTube. Observed 2026-09: the 2026.07.04 pin failed with
+    "unable to extract yt initial data" while 2026.08.19 worked. The previous
+    version of this test asserted the pin, which meant the rot could not be
+    noticed or fixed without also editing the test.
+    """
+    constraints = (Path(__file__).parents[1] / "constraints.txt").read_text(
+        encoding="utf-8"
+    )
+    requirements = [
+        line.strip()
+        for line in constraints.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    ytdlp_requirements = [
+        line for line in requirements if line.replace(" ", "").startswith("yt-dlp")
+    ]
+
+    assert ytdlp_requirements, "constraints.txt must still constrain yt-dlp"
+    for requirement in ytdlp_requirements:
+        assert "==" not in requirement, (
+            f"yt-dlp must not be pinned to an exact release: {requirement}"
+        )
+        assert ">=" in requirement, f"yt-dlp needs a minimum floor: {requirement}"
 
 
 def test_project_installs_official_ytdlp_default_dependencies():
+    """The [default] extra is the part that matters — it pulls yt-dlp-ejs,
+    which solves YouTube's JS challenges. Assert the extra and a floor, not a
+    specific version."""
     root = Path(__file__).parents[1]
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
     constraints = (root / "constraints.txt").read_text(encoding="utf-8")
 
-    assert '"yt-dlp[default]>=2026.07.04"' in pyproject
-    assert "yt-dlp-ejs==0.8.0" in constraints
+    assert '"yt-dlp[default]>=' in pyproject
+    assert "yt-dlp-ejs>=" in constraints
 
 
 def test_check_ok_with_deno():
@@ -240,3 +264,68 @@ def test_check_ok_flags_missing_ffprobe_for_transcription():
     assert status == "ok"
     assert "ffprobe" in message
     assert "可转写音频" not in message
+
+
+# --- check(): stale-release gate -------------------------------------------- #
+# A stale yt-dlp answers --version happily and only fails at extraction time,
+# so version presence alone cannot detect the most common real-world failure.
+
+def test_release_age_is_computed_without_network():
+    import datetime
+
+    from agent_reach.channels.youtube import _ytdlp_release_age_days
+
+    today = datetime.date(2026, 9, 14)
+    assert _ytdlp_release_age_days((2026, 8, 19), today=today) == 26
+    assert _ytdlp_release_age_days((2026, 7, 4), today=today) == 72
+
+
+def test_release_age_returns_none_for_impossible_dates():
+    """An unparseable or invalid version must not be treated as infinitely old."""
+    import datetime
+
+    from agent_reach.channels.youtube import _ytdlp_release_age_days
+
+    today = datetime.date(2026, 9, 14)
+    assert _ytdlp_release_age_days((2026, 13, 45), today=today) is None
+    assert _ytdlp_release_age_days((), today=today) is None
+
+
+def test_check_warns_when_ytdlp_release_is_stale():
+    ch = YouTubeChannel()
+    probe = ProbeResult("ok", output="2026.07.04")  # the build that broke YouTube
+    with patch.object(yt, "probe_command", return_value=probe), \
+         patch("shutil.which", side_effect=_which("deno")):
+        status, message = ch.check()
+
+    assert status == "warn"
+    assert "unable to extract yt initial data" in message
+    assert 'pip install -U "yt-dlp[default]"' in message
+    # The tool itself still runs, so the backend is not disowned.
+    assert ch.active_backend == "yt-dlp"
+
+
+def test_check_ok_when_release_is_recent():
+    import datetime
+
+    ch = YouTubeChannel()
+    fresh = datetime.date.today().strftime("%Y.%m.%d")
+    with patch.object(yt, "probe_command", return_value=ProbeResult("ok", output=fresh)), \
+         patch("shutil.which", side_effect=_which("deno")):
+        status, message = ch.check()
+
+    assert status == "ok"
+    assert "可提取视频信息和字幕" in message
+
+
+def test_stale_gate_does_not_mask_missing_js_runtime():
+    """A stale build with no JS runtime must still get the JS-runtime fix first —
+    that one blocks YouTube outright, whereas staleness is a probability."""
+    ch = YouTubeChannel()
+    probe = ProbeResult("ok", output="2026.07.04")
+    with patch.object(yt, "probe_command", return_value=probe), \
+         patch("shutil.which", side_effect=_which()):
+        status, message = ch.check()
+
+    assert status == "warn"
+    assert "JS runtime" in message

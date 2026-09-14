@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """YouTube — check if yt-dlp is available with JS runtime."""
 
+import datetime as _datetime
 import re
 import shutil
 
@@ -16,6 +17,27 @@ from .base import Channel
 
 _JS_RUNTIMES_SUPPORTED_FROM = (2025, 11, 12)
 _YTDLP_UPGRADE_COMMAND = 'python -m pip install -U "yt-dlp[default]"'
+
+#: YouTube ships extractor-breaking changes continuously, so an old yt-dlp is
+#: the single most likely reason this channel fails in practice — and version
+#: presence alone cannot detect it: a stale build answers `--version` happily
+#: and only fails at extraction time with "unable to extract yt initial data".
+#: Doctor cannot prove extraction works without a network fetch, but it CAN
+#: refuse to call a months-old release healthy. 42 days is ~3 release cycles.
+_YTDLP_STALE_AFTER_DAYS = 42
+
+
+def _ytdlp_release_age_days(version: tuple, today=None):
+    """Days since a yt-dlp calendar release, or None if it is not a real date.
+
+    yt-dlp versions are dates (2026.08.19), so age needs no network call.
+    """
+    try:
+        released = _datetime.date(*version)
+    except (TypeError, ValueError):
+        return None
+    reference = today or _datetime.date.today()
+    return (reference - released).days
 
 
 def _parse_ytdlp_version(version: str):
@@ -115,6 +137,20 @@ class YouTubeChannel(Channel):
                     )
                 else:
                     msg += f"，可转写音频（{'/'.join(providers)}）"
+
+        # Last gate: everything above proves yt-dlp RUNS, not that it can still
+        # extract. A stale release passes every check yet fails on real URLs,
+        # so refuse to report "ok" for one — the prescription is the same
+        # single command either way.
+        version = _parse_ytdlp_version(probe.output)
+        age_days = _ytdlp_release_age_days(version) if version else None
+        if age_days is not None and age_days > _YTDLP_STALE_AFTER_DAYS:
+            return "warn", (
+                f"yt-dlp 版本已发布 {age_days} 天（{'.'.join(map(str, version))}），"
+                "YouTube 提取器可能已失效（典型报错：unable to extract yt initial "
+                f"data）。升级：\n  {_YTDLP_UPGRADE_COMMAND}\n"
+                "注意 `yt-dlp -U` 无法更新 pip 安装的版本。"
+            )
         return "ok", msg
 
     def transcribe(

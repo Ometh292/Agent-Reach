@@ -358,6 +358,24 @@ def _provider_key(provider: str, config: Config) -> Optional[str]:
     return val or None
 
 
+#: Shown when a Whisper POST fails TLS verification. Consumer antivirus
+#: ("encrypted connection scanning" in Kaspersky / Avast / ESET / Bitdefender)
+#: and corporate proxies terminate TLS and re-sign it with a local root. That
+#: root lives in the OS trust store, which requests never consults — it pins
+#: certifi — so the failure looks like a server problem and is not one.
+_TLS_INTERCEPTION_HINT = (
+    "本机 TLS 似乎被中间人拦截（常见于杀毒软件的「加密连接扫描」："
+    "Kaspersky / Avast / ESET / Bitdefender，或企业代理）。"
+    "拦截方根证书装在操作系统信任库里，但 requests 只信任 certifi，"
+    "因此报 self signed certificate in certificate chain。"
+    "三种修法（都不要关闭证书校验）：(1) 把拦截方根证书追加到 certifi 副本，"
+    "再用 SSL_CERT_FILE / REQUESTS_CA_BUNDLE 指向合并后的 .pem；"
+    "(2) pip install truststore，让 Python 直接读操作系统信任库；"
+    "(3) 在杀毒软件里把该 API 域名加入加密扫描排除列表。"
+    "详见 docs/troubleshooting.md"
+)
+
+
 def transcribe_chunk(
     chunk: Path,
     provider: str,
@@ -386,6 +404,13 @@ def transcribe_chunk(
                 data={"model": info["model"], "response_format": "text"},
                 timeout=timeout,
             )
+        except requests.exceptions.SSLError as e:
+            # Checked before RequestException: SSLError is a subclass, and a
+            # bare "network error" sent users hunting a connectivity problem
+            # that does not exist.
+            raise TranscribeError(
+                f"{provider}: TLS verification failed: {e} — {_TLS_INTERCEPTION_HINT}"
+            ) from e
         except requests.RequestException as e:
             raise TranscribeError(f"{provider}: network error: {e}") from e
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for Agent Reach CLI."""
 
+import os
 import shutil
 import subprocess
 from argparse import Namespace
@@ -433,3 +434,77 @@ class TestWatchVersionCompare:
         out = capsys.readouterr().out
         assert "新版本可用" not in out
         assert "全部正常" in out
+
+
+# --- installer: tool discovery before PATH refresh -------------------------- #
+# pipx/uv install shims into a bin dir the RUNNING process may not have on
+# PATH (pipx defaults to ~/.local/bin on Windows). shutil.which() alone
+# therefore reported a successful install as a failure, printing
+# "twitter-cli install failed" for a working 0.8.5 and then exiting non-zero.
+
+class TestFindInstalledTool:
+    def test_prefers_path_lookup(self, monkeypatch):
+        monkeypatch.setattr("shutil.which", lambda cmd: "/usr/bin/twitter")
+        assert cli._find_installed_tool("twitter") == "/usr/bin/twitter"
+
+    def test_falls_back_to_pipx_bin_dir(self, tmp_path, monkeypatch):
+        bin_dir = tmp_path / "pipxbin"
+        bin_dir.mkdir()
+        suffix = ".exe" if os.name == "nt" else ""
+        shim = bin_dir / f"twitter{suffix}"
+        shim.write_text("#!/bin/sh\n", encoding="utf-8")
+
+        monkeypatch.setattr("shutil.which", lambda cmd: None)
+        monkeypatch.setenv("PIPX_BIN_DIR", str(bin_dir))
+
+        assert cli._find_installed_tool("twitter") == str(shim)
+
+    def test_returns_none_when_genuinely_absent(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("shutil.which", lambda cmd: None)
+        monkeypatch.setenv("PIPX_BIN_DIR", str(tmp_path / "empty"))
+        monkeypatch.setenv("UV_TOOL_BIN_DIR", str(tmp_path / "also-empty"))
+        assert cli._find_installed_tool("definitely-not-a-tool") is None
+
+    def test_reports_success_when_shim_only_exists_off_path(self, tmp_path, monkeypatch, capsys):
+        """The regression itself: a successful pipx install must not be called a failure."""
+        bin_dir = tmp_path / "pipxbin"
+        bin_dir.mkdir()
+        suffix = ".exe" if os.name == "nt" else ""
+        (bin_dir / f"twitter{suffix}").write_text("#!/bin/sh\n", encoding="utf-8")
+        monkeypatch.setenv("PIPX_BIN_DIR", str(bin_dir))
+
+        # `twitter` is absent from PATH; only `pipx` resolves.
+        def fake_which(cmd):
+            return "/usr/bin/pipx" if cmd == "pipx" else None
+
+        monkeypatch.setattr("shutil.which", fake_which)
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *a, **k: subprocess.CompletedProcess(a[0] if a else [], 0, "", ""),
+        )
+
+        assert cli._install_twitter_deps() is True
+        out = capsys.readouterr().out
+        assert "install failed" not in out
+
+
+# --- report rendering ------------------------------------------------------- #
+
+def test_install_and_doctor_render_markup_through_rich(monkeypatch, capsys):
+    """format_report() returns Rich markup, so it must never reach bare print().
+
+    `install` previously did, leaking literal "[bold cyan]" / "[green]" tags.
+    """
+    printed = {}
+    monkeypatch.setattr(cli, "_print_report", lambda report: printed.setdefault("report", report))
+    cli._print_report("[bold cyan]hello[/bold cyan]")
+    assert printed["report"] == "[bold cyan]hello[/bold cyan]"
+
+
+def test_print_report_emits_no_literal_markup_tags(capsys):
+    cli._print_report("[bold cyan]Agent Reach[/bold cyan] [green]OK[/green]")
+    out = capsys.readouterr().out
+    assert "[bold cyan]" not in out
+    assert "[green]" not in out
+    assert "Agent Reach" in out
+    assert "OK" in out

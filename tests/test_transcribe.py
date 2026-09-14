@@ -906,3 +906,52 @@ class TestConfigOpenAIWhisper:
         assert not fake_config.is_configured("openai_whisper")
         fake_config.set("openai_api_key", "sk-test")
         assert fake_config.is_configured("openai_whisper")
+
+
+# --- TLS interception ------------------------------------------------------- #
+# Consumer antivirus ("encrypted connection scanning" in Kaspersky / Avast /
+# ESET / Bitdefender) and corporate proxies re-sign TLS with a local root that
+# lives in the OS trust store. requests pins certifi, so this surfaces as a
+# certificate error that looks like a server fault and is not one.
+
+def test_ssl_error_reports_tls_interception_not_network_error(
+    chunk_file, fake_config, monkeypatch
+):
+    fake_config.set("groq_api_key", "gsk_test")
+
+    def fake_post(*_args, **_kwargs):
+        raise tr.requests.exceptions.SSLError(
+            "certificate verify failed: self signed certificate in certificate chain"
+        )
+
+    monkeypatch.setattr(tr.requests, "post", fake_post)
+    with pytest.raises(tr.TranscribeError) as excinfo:
+        tr.transcribe_chunk(chunk_file, "groq", config=fake_config)
+
+    message = str(excinfo.value)
+    assert "TLS verification failed" in message
+    # Must not be mistaken for connectivity loss — that sent users hunting a
+    # network problem that does not exist.
+    assert "network error" not in message
+    # Must name the non-insecure remedies, never "disable verification".
+    assert "SSL_CERT_FILE" in message
+    assert "truststore" in message
+    assert "docs/troubleshooting.md" in message
+
+
+def test_non_ssl_request_errors_still_report_as_network_error(
+    chunk_file, fake_config, monkeypatch
+):
+    """The SSLError branch must not swallow ordinary connectivity failures."""
+    fake_config.set("groq_api_key", "gsk_test")
+
+    def fake_post(*_args, **_kwargs):
+        raise tr.requests.exceptions.ConnectTimeout("timed out")
+
+    monkeypatch.setattr(tr.requests, "post", fake_post)
+    with pytest.raises(tr.TranscribeError) as excinfo:
+        tr.transcribe_chunk(chunk_file, "groq", config=fake_config)
+
+    message = str(excinfo.value)
+    assert "network error" in message
+    assert "TLS verification failed" not in message

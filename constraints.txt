@@ -8,8 +8,15 @@ python-dotenv==1.2.1
 loguru==0.7.3
 PyYAML==6.0.3
 rich==14.3.2
-yt-dlp==2026.07.04
-yt-dlp-ejs==0.8.0
+# yt-dlp and yt-dlp-ejs are deliberately NOT pinned.
+# YouTube ships extractor-breaking changes every few weeks, and tracking
+# them is the entire value of yt-dlp. A pin here does not buy
+# reproducibility -- it guarantees that anyone installing via this file
+# lands on a build that cannot read YouTube (observed 2026-09: the
+# 2026.07.04 pin failed with "unable to extract yt initial data" while
+# 2026.08.19 worked). Upgrade with: pip install -U "yt-dlp[default]"
+yt-dlp>=2026.08.19
+yt-dlp-ejs>=0.8.0
 
 pytest==8.0.0
 ruff==0.15.1
