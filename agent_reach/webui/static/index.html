@@ -120,8 +120,16 @@
   .ch-n{font-weight:600;font-size:var(--s--1)}
   .ch-b{font-family:var(--mono);font-size:.7rem;color:var(--ink-faint);display:block;
     margin-top:.15rem}
+  /* Clamp to three lines rather than scrolling inside the card: a nested
+     scrollbar per card reads as broken, and long prescriptions with URLs
+     produced a horizontal one too. */
   .ch-m{font-size:.78rem;color:var(--ink-soft);margin:.4rem 0 0;line-height:1.45;
-    max-height:5em;overflow:auto;white-space:pre-wrap}
+    white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+  .ch-m.open{display:block;-webkit-line-clamp:unset}
+  .more{background:none;border:none;padding:.2rem 0 0;font:inherit;
+    font-size:.72rem;font-family:var(--mono);color:var(--accent);cursor:pointer;
+    text-decoration:underline;text-underline-offset:2px}
   .pill{font-family:var(--mono);font-size:.67rem;font-weight:500;letter-spacing:.05em;
     text-transform:uppercase;padding:.13em .45em;border-radius:2px;
     border:1px solid currentColor;white-space:nowrap;flex:none}
@@ -511,6 +519,21 @@ function renderStatus(result) {
         <p class="ch-m">${escapeHtml(c.message || "")}</p>
       </article>`;
   }).join("");
+
+  // Only clipped messages get a toggle — an always-present "more" that does
+  // nothing is worse than none at all.
+  $("channels").querySelectorAll(".ch-m").forEach((message) => {
+    if (message.scrollHeight <= message.clientHeight + 1) return;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "more";
+    toggle.textContent = "show more";
+    toggle.addEventListener("click", () => {
+      const open = message.classList.toggle("open");
+      toggle.textContent = open ? "show less" : "show more";
+    });
+    message.insertAdjacentElement("afterend", toggle);
+  });
 }
 
 $("refreshStatus").addEventListener("click", loadStatus);
