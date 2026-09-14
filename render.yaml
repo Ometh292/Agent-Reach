@@ -1,0 +1,79 @@
+# Render Blueprint — Agent Reach hosted client application.
+#
+# This deploys agent_reach.webserver: sign in with Supabase, then search the
+# web, read pages, pull YouTube details and (if a key is supplied) transcribe.
+# It does NOT deploy the local operator console, which installs software and
+# writes credentials and must never be exposed.
+#
+# To use: Render Dashboard → New → Blueprint → pick this repository. Render
+# prompts for every value marked `sync: false`; nothing secret lives in here.
+
+services:
+  - type: web
+    name: agent-reach
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+
+    # Cheapest always-on plan. Two reasons not to use `free` here:
+    #   - free instances sleep after inactivity, and connected accounts are
+    #     held in memory, so every sleep silently disconnects everyone;
+    #   - the first request after a sleep takes the better part of a minute.
+    # Raise to 1c-2g before enabling transcription: ffmpeg plus a downloaded
+    # audio track will not fit comfortably in 512 MB.
+    plan: 0.5c-512mb
+
+    # The app answers /healthz without touching the network or a credential,
+    # so this is a true liveness signal rather than a probe of Exa or GitHub.
+    healthCheckPath: /healthz
+
+    # Deliberate deploys for a client-facing service: a merge should not change
+    # what the client is using without someone deciding to. Set to true once
+    # the deployment has settled and you want push-to-deploy.
+    autoDeploy: false
+
+    envVars:
+      # ---- required: without these the sign-in page says so and nothing works
+      - key: SUPABASE_URL              # https://<ref>.supabase.co
+        sync: false
+      - key: SUPABASE_ANON_KEY         # the "anon / public" key; safe in a browser
+        sync: false
+
+      # ---- optional ----------------------------------------------------
+      # Verifies sessions locally with no round-trip to Supabase. Without it
+      # the server asks Supabase once per new token, which also works.
+      # NEVER send this to a browser.
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      # Enables the Transcribe tab. Every transcription spends this key, so
+      # keep RATE_LIMIT_TRANSCRIBE low. Omit it and the tab stays hidden.
+      - key: GROQ_API_KEY
+        sync: false
+      # Raises GitHub search from 60 to 5000 requests/hour. A token with no
+      # scopes is enough. It is the operator's token and never reaches a browser.
+      - key: GITHUB_TOKEN
+        sync: false
+
+      # ---- fixed configuration ----------------------------------------
+      # The frontend is served by this same service, so no cross-origin access
+      # is needed. Leave empty unless the UI is deliberately hosted elsewhere.
+      - key: ALLOWED_ORIGINS
+        value: ""
+      # Per-signed-in-user budgets, as requests/seconds. Every request spends
+      # the operator's quota rather than the caller's, which is why these exist.
+      - key: RATE_LIMIT_SEARCH
+        value: 60/3600
+      - key: RATE_LIMIT_READ
+        value: 60/3600
+      - key: RATE_LIMIT_BROWSE
+        value: 60/3600
+      - key: RATE_LIMIT_YOUTUBE
+        value: 30/3600
+      - key: RATE_LIMIT_TRANSCRIBE
+        value: 3/3600
+
+# Note on scaling: rate-limit buckets and connected accounts both live in the
+# instance's memory. Running more than one instance multiplies the effective
+# rate limit by the instance count and means a user's connected account is only
+# present on whichever instance served the connect request. Staying on a single
+# instance is a correctness requirement today, not a cost decision.
