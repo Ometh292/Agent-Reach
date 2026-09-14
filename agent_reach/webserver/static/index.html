@@ -109,6 +109,111 @@
   .out:empty{display:none}
   .out .note{color:var(--ink-faint)}
   .out .bad{color:var(--bad)}
+  .res .out{margin-top:0;max-height:44rem}
+
+  /* ---------------- results ---------------- */
+  .res{margin-top:1rem}
+  .res-bar{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;
+    justify-content:space-between;border-bottom:1px solid var(--rule);
+    padding-bottom:.6rem;margin-bottom:1.1rem}
+  .res-sum{font-size:var(--s--1);color:var(--ink-soft)}
+  .res-sum b{color:var(--ink);font-weight:600}
+  .res-acts{display:flex;gap:.45rem;align-items:center}
+  .seg{display:flex;border:1px solid var(--rule-strong);border-radius:5px;overflow:hidden}
+  .seg button{background:transparent;border:none;border-radius:0;padding:.3rem .7rem;
+    font-size:.75rem;color:var(--ink-soft)}
+  .seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+  .mini{background:transparent;border:1px solid var(--rule-strong);color:var(--ink-soft);
+    padding:.3rem .7rem;font-size:.75rem}
+  .mini:hover{color:var(--ink);border-color:var(--ink-faint)}
+  .res-note{font-family:var(--mono);font-size:.75rem;color:var(--ink-faint);margin:.9rem 0 0}
+  .res-note.bad{color:var(--bad)}
+  .res a{color:var(--accent)}
+
+  /* one card per result — the whole point of the reading view */
+  .hits{display:grid;gap:.85rem;list-style:none;padding:0;margin:0;
+    max-height:52rem;overflow:auto}
+  .hit{background:var(--raised);border:1px solid var(--rule);border-radius:7px;
+    padding:1rem 1.1rem;display:grid;gap:.55rem}
+  .hit-n{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint)}
+  .hit-t{font-family:var(--serif);font-size:var(--s-1);font-weight:600;
+    line-height:1.3;margin:0}
+  .hit-t a{color:var(--ink);text-decoration:none}
+  .hit-t a:hover{color:var(--accent);text-decoration:underline}
+  .hit-m{display:flex;flex-wrap:wrap;gap:.2rem .9rem;font-family:var(--mono);
+    font-size:.72rem;color:var(--ink-faint)}
+  .hit-b{line-height:1.7;color:var(--ink-soft);margin:0;max-width:70ch}
+  .excerpts{display:grid;gap:.6rem}
+  .excerpt{border-left:2px solid var(--rule-strong);padding-left:.85rem;
+    line-height:1.7;color:var(--ink-soft);max-width:70ch}
+  .excerpt .gap{color:var(--ink-faint);font-family:var(--mono)}
+  .excerpt > :last-child{margin-bottom:0}
+  .hit-x{display:grid;grid-template-columns:auto 1fr;gap:.2rem .9rem;
+    font-size:.75rem;margin:0;color:var(--ink-faint)}
+  .hit-x dt{font-family:var(--mono)}
+  .hit-x dd{margin:0;overflow-wrap:anywhere}
+  .replies{display:grid;gap:.55rem;margin:.15rem 0 0;padding:0;list-style:none}
+  .reply{border-top:1px solid var(--rule);padding-top:.55rem;line-height:1.65;
+    color:var(--ink-soft);max-width:70ch}
+  .reply .who{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint);
+    display:block;margin-bottom:.2rem}
+  .notice{background:var(--warn-bg);border:1px solid var(--warn);border-left-width:3px;
+    border-radius:5px;padding:.7rem .85rem;font-size:var(--s--1);line-height:1.55;
+    color:var(--ink-soft);margin:0}
+
+  /* every address is a real link, never a line of text to copy by hand */
+  .link{display:inline-block;max-width:100%;font-family:var(--mono);font-size:.72rem;
+    color:var(--accent);text-decoration:none;background:var(--sunk);
+    border:1px solid var(--rule);border-radius:99px;padding:.18rem .7rem;
+    overflow-wrap:anywhere;justify-self:start}
+  .link:hover{border-color:var(--accent)}
+  .links{margin-top:1.3rem;border-top:1px solid var(--rule);padding-top:1rem}
+  .links h4{font-family:var(--mono);font-size:.72rem;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--ink-faint);font-weight:500;margin:0 0 .7rem}
+  .links ol{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
+  .links li{display:grid;grid-template-columns:1.6rem 1fr;gap:.5rem;align-items:baseline}
+  .links .i{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint)}
+  .links a{color:var(--ink);text-decoration:none;font-size:var(--s--1);
+    overflow-wrap:anywhere}
+  .links a:hover{color:var(--accent);text-decoration:underline}
+  .links .host{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint);display:block}
+  .links .more{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint);margin:.6rem 0 0}
+
+  /* readable prose, for an article or a transcript */
+  .doc{background:var(--raised);border:1px solid var(--rule);border-radius:7px;
+    padding:1.4rem 1.5rem;max-height:46rem;overflow:auto}
+  .doc-h{border-bottom:1px solid var(--rule);padding-bottom:.9rem;margin-bottom:1.2rem;
+    display:grid;gap:.45rem;justify-items:start}
+  .doc-h h3{font-family:var(--serif);font-size:var(--s-2);font-weight:600;
+    margin:0;line-height:1.25}
+  .doc-h h3 a{color:var(--ink);text-decoration:none}
+  .doc-h h3 a:hover{color:var(--accent);text-decoration:underline}
+  /* a video with no extra output has a header and nothing under it */
+  .doc-h:last-child{border-bottom:none;padding-bottom:0;margin-bottom:0}
+  .prose{font-size:var(--s-0);line-height:1.7;color:var(--ink)}
+  .prose > :first-child{margin-top:0}
+  .prose > :last-child{margin-bottom:0}
+  .prose h1,.prose h2,.prose h3,.prose h4{font-family:var(--serif);line-height:1.3;
+    margin:1.7rem 0 .55rem;font-weight:600}
+  .prose h1{font-size:var(--s-2)}
+  .prose h2{font-size:var(--s-1)}
+  .prose h3{font-size:var(--s-0)}
+  .prose h4{font-size:var(--s--1);font-family:var(--mono);text-transform:uppercase;
+    letter-spacing:.05em;color:var(--ink-faint)}
+  .prose p{margin:0 0 .95rem;max-width:70ch}
+  .prose ul,.prose ol{margin:0 0 .95rem;padding-left:1.35rem;max-width:70ch}
+  .prose li{margin-bottom:.3rem}
+  .prose blockquote{margin:0 0 .95rem;padding-left:.9rem;
+    border-left:2px solid var(--rule-strong);color:var(--ink-soft)}
+  .prose pre{background:var(--sunk);border:1px solid var(--rule);border-radius:5px;
+    padding:.8rem .9rem;overflow-x:auto;font-family:var(--mono);font-size:.8rem;
+    line-height:1.5;margin:0 0 .95rem}
+  .prose code{font-family:var(--mono);font-size:.85em;background:var(--sunk);
+    border-radius:3px;padding:.1em .35em}
+  .prose pre code{background:none;padding:0;font-size:1em}
+  .prose a{color:var(--accent);overflow-wrap:anywhere}
+  .prose hr{border:none;border-top:1px solid var(--rule);margin:1.5rem 0}
+  .prose .imgref{font-family:var(--mono);font-size:.75rem;color:var(--ink-faint)}
   .working{display:inline-flex;gap:.5rem;align-items:center;color:var(--ink-soft);
     font-family:var(--mono);font-size:var(--s--1)}
   .spin{width:.7rem;height:.7rem;border:2px solid var(--rule-strong);
@@ -295,7 +400,7 @@
           <button class="btn" id="goSearch">Search</button>
         </div>
         <div class="examples" id="examples"></div>
-        <div class="out" id="searchOut"></div>
+        <div class="res" id="searchOut" hidden></div>
         <p class="quota" id="qSearch"></p>
       </div>
     </section>
@@ -312,7 +417,7 @@
           </label>
           <button class="btn" id="goRead">Read</button>
         </div>
-        <div class="out" id="readOut"></div>
+        <div class="res" id="readOut" hidden></div>
         <p class="quota" id="qRead"></p>
       </div>
     </section>
@@ -329,7 +434,7 @@
           </label>
           <button class="btn" id="goYt">Read video</button>
         </div>
-        <div class="out" id="ytOut"></div>
+        <div class="res" id="ytOut" hidden></div>
         <p class="quota" id="qYoutube"></p>
       </div>
     </section>
@@ -345,9 +450,8 @@
             <input type="url" id="trUrl" placeholder="https://…" autocomplete="off">
           </label>
           <button class="btn" id="goTr">Transcribe</button>
-          <button class="btn-q" id="copyTr" disabled>Copy text</button>
         </div>
-        <div class="out" id="trOut"></div>
+        <div class="res" id="trOut" hidden></div>
         <p class="quota" id="qTranscribe"></p>
       </div>
     </section>
@@ -531,48 +635,616 @@ async function api(path, options = {}) {
   return data;
 }
 
-async function stream(operation, params, target, button) {
-  target.textContent = "";
-  if (button) button.disabled = true;
-  const spinner = document.createElement("span");
-  spinner.className = "working";
-  spinner.innerHTML = '<span class="spin"></span>working…';
-  target.appendChild(spinner);
+/* ─────────── reading the results ───────────
+ *
+ * Every source answers in a different shape: Exa returns labelled blocks,
+ * GitHub and V2EX return one JSON object per line, the web reader returns an
+ * article in Markdown, yt-dlp prints four fields. Dumping all of that into one
+ * monospace box made the reader do the parsing by eye, and turned every
+ * address into text to be copied by hand.
+ *
+ * So the shape is detected from the output itself, each result is rendered as
+ * its own card, and every address becomes a real link. The backend is
+ * unchanged — "Plain text" still shows exactly what it sent.
+ *
+ * Everything below escapes before it builds HTML: this content comes from
+ * arbitrary web pages and is never trusted.
+ */
 
-  let collected = "";
+const HTTP_ONLY = /^https?:\/\//i;
+
+/** A URL is only ever emitted after this says so — no javascript:, no data:. */
+function safeUrl(raw) {
+  const url = String(raw ?? "").trim();
+  return HTTP_ONLY.test(url) ? url : null;
+}
+function hostOf(url) {
+  try { return new URL(url).host.replace(/^www\./, ""); } catch { return url; }
+}
+function linkChip(url) {
+  const safe = safeUrl(url);
+  if (!safe) return "";
+  return `<a class="link" href="${esc(safe)}" target="_blank" rel="noopener noreferrer nofollow">${esc(hostOf(safe))} ↗</a>`;
+}
+function titleLink(url, text) {
+  const safe = safeUrl(url);
+  if (!safe) return esc(text);
+  return `<a href="${esc(safe)}" target="_blank" rel="noopener noreferrer nofollow">${esc(text)}</a>`;
+}
+
+/** Dates arrive as ISO strings, RFC strings and unix seconds. Show a date. */
+function when(value) {
+  if (value === null || value === undefined || value === "" || value === "N/A") return "";
+  const date = (typeof value === "number" || /^\d{9,11}$/.test(String(value)))
+    ? new Date(Number(value) * 1000)
+    : new Date(String(value));
+  if (isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function duration(seconds) {
+  const total = Number(String(seconds).replace(/[^\d]/g, ""));
+  if (!Number.isFinite(total) || total <= 0) return String(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total / 60) % 60;
+  const rest = String(total % 60).padStart(2, "0");
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}`
+    : `${minutes}:${rest}`;
+}
+
+/* ---- a small Markdown subset, escaped first ---- */
+
+function inline(raw) {
+  let out = esc(raw);
+  // Images are named, never loaded: fetching one would hand the reader's
+  // address to whichever site the page pointed at.
+  out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, (_m, alt) =>
+    `<span class="imgref">[image${alt ? ": " + alt : ""}]</span>`);
+  out = out.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, (_m, text, url) => {
+    const safe = safeUrl(url);
+    return safe
+      ? `<a href="${safe}" target="_blank" rel="noopener noreferrer nofollow">${text}</a>`
+      : text;
+  });
+  out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
+  out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  out = out.replace(/(^|[\s(])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  return linkifyBare(out);
+}
+
+/** Link a plain address written in running text.
+ *
+ * Runs last and only on the parts that are not already inside a tag, so an
+ * address inside a link or a code span is left exactly as it is. */
+function linkifyBare(html) {
+  return html
+    .split(/(<a\b[^>]*>.*?<\/a>|<code>.*?<\/code>|<[^>]+>)/g)
+    .map((part, index) => index % 2 === 1 ? part : part.replace(
+      /https?:\/\/[^\s<>"')\]]+/g, (url) => {
+        const trailing = (url.match(/[.,;:!?]+$/) || [""])[0];
+        const target = trailing ? url.slice(0, -trailing.length) : url;
+        return `<a href="${target}" target="_blank" rel="noopener noreferrer nofollow">`
+               + `${target}</a>${trailing}`;
+      }))
+    .join("");
+}
+
+function prose(text) {
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  const out = [];
+  let para = [], list = null, quote = [], fence = null;
+
+  const endPara = () => {
+    if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; }
+  };
+  const endList = () => {
+    if (list) {
+      out.push(`<${list.tag}>` + list.items.map((i) => `<li>${inline(i)}</li>`).join("")
+               + `</${list.tag}>`);
+      list = null;
+    }
+  };
+  const endQuote = () => {
+    if (quote.length) { out.push(`<blockquote>${inline(quote.join(" "))}</blockquote>`); quote = []; }
+  };
+  const endAll = () => { endPara(); endList(); endQuote(); };
+
+  for (const line of lines) {
+    if (fence !== null) {
+      if (/^\s*```/.test(line)) {
+        out.push(`<pre><code>${esc(fence.join("\n"))}</code></pre>`);
+        fence = null;
+      } else fence.push(line);
+      continue;
+    }
+    if (/^\s*```/.test(line)) { endAll(); fence = []; continue; }
+    if (!line.trim()) { endAll(); continue; }
+
+    let m;
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+      endAll();
+      const level = Math.min(m[1].length + 1, 4);
+      out.push(`<h${level}>${inline(m[2])}</h${level}>`);
+      continue;
+    }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { endAll(); out.push("<hr>"); continue; }
+    if ((m = line.match(/^\s*>\s?(.*)$/))) { endPara(); endList(); quote.push(m[1]); continue; }
+    if ((m = line.match(/^\s*[-*+]\s+(.*)$/))) {
+      endPara(); endQuote();
+      if (!list || list.tag !== "ul") { endList(); list = { tag: "ul", items: [] }; }
+      list.items.push(m[1]);
+      continue;
+    }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
+      endPara(); endQuote();
+      if (!list || list.tag !== "ol") { endList(); list = { tag: "ol", items: [] }; }
+      list.items.push(m[1]);
+      continue;
+    }
+    endList(); endQuote();
+    para.push(line.trim());
+  }
+  if (fence !== null) out.push(`<pre><code>${esc(fence.join("\n"))}</code></pre>`);
+  endAll();
+  return out.join("");
+}
+
+/** Every address in a body of text, gathered into a list of its own. */
+function gatherLinks(text) {
+  const found = new Map();
+  const source = String(text || "");
+  let m;
+  const markdown = /\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g;
+  while ((m = markdown.exec(source))) {
+    const url = safeUrl(m[2]);
+    if (url && !found.has(url)) found.set(url, m[1].trim() || hostOf(url));
+  }
+  const bare = /(^|[\s<("'])(https?:\/\/[^\s<>)\]"']+)/g;
+  while ((m = bare.exec(source))) {
+    const url = m[2].replace(/[.,;:]+$/, "");
+    if (!found.has(url)) found.set(url, hostOf(url));
+  }
+  return [...found].map(([url, label]) => ({ url, label }));
+}
+
+const LINK_LIMIT = 80;
+
+function linkSection(text, heading) {
+  const links = gatherLinks(text);
+  if (!links.length) return "";
+  const shown = links.slice(0, LINK_LIMIT);
+  const more = links.length - shown.length;
+  return `<section class="links"><h4>${esc(heading || "Links on this page")} · ${links.length}</h4><ol>`
+    + shown.map((link, index) =>
+        `<li><span class="i">${index + 1}</span><span>`
+        + `<a href="${esc(link.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(link.label)}</a>`
+        + `<span class="host">${esc(hostOf(link.url))}</span></span></li>`).join("")
+    + `</ol>${more > 0 ? `<p class="more">and ${more} more</p>` : ""}</section>`;
+}
+
+/* ---- reading each source's shape ---- */
+
+/** One JSON object per line: GitHub, V2EX, RSS, Xueqiu. */
+function parseRecords(lines) {
+  const records = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed[0] !== "{") return null;
+    try {
+      const value = JSON.parse(trimmed);
+      if (!value || typeof value !== "object") return null;
+      records.push(value);
+    } catch { return null; }
+  }
+  return records.length ? records : null;
+}
+
+/** One indented JSON object across many lines: a V2EX thread. */
+function parseWholeJson(text) {
+  const trimmed = text.trim();
+  if (trimmed[0] !== "{" && trimmed[0] !== "[") return null;
   try {
-    const { job } = await api("/api/run", { method: "POST",
-      body: JSON.stringify({ operation, params }) });
+    const value = JSON.parse(trimmed);
+    if (!value || typeof value !== "object") return null;
+    return Array.isArray(value) ? value : [value];
+  } catch { return null; }
+}
+
+/** The web reader's output: a few labelled headers, then Markdown. */
+function parseArticle(text) {
+  if (!/^\s*Title:/.test(text) || !/\nURL Source:/.test(text)) return null;
+  const marker = "\nMarkdown Content:";
+  const split = text.indexOf(marker);
+  const head = split === -1 ? text : text.slice(0, split);
+  const article = { markdown: split === -1 ? "" : text.slice(split + marker.length).trim() };
+  head.split("\n").forEach((line) => {
+    let m;
+    if ((m = line.match(/^Title:\s*(.*)$/))) article.title = m[1].trim();
+    else if ((m = line.match(/^URL Source:\s*(.*)$/))) article.url = m[1].trim();
+    else if ((m = line.match(/^Published Time:\s*(.*)$/))) article.published = m[1].trim();
+    else if ((m = line.match(/^Warning:\s*(.*)$/))) article.warning = m[1].trim();
+  });
+  return (article.title || article.url) ? article : null;
+}
+
+/** Exa's answer: repeated Title/URL/Published/Author blocks, then excerpts. */
+function parseExa(text) {
+  const hits = [];
+  let current = null, body = [];
+  const close = () => {
+    if (current) { current.body = body.join("\n").trim(); hits.push(current); }
+    current = null; body = [];
+  };
+  for (const line of text.replace(/\r/g, "").split("\n")) {
+    let m;
+    if ((m = line.match(/^Title:\s*(.*)$/))) { close(); current = { title: m[1].trim() }; continue; }
+    if (!current) continue;
+    if ((m = line.match(/^URL:\s*(.*)$/))) { current.url = m[1].trim(); continue; }
+    if ((m = line.match(/^Published:\s*(.*)$/))) { current.published = m[1].trim(); continue; }
+    if ((m = line.match(/^Author:\s*(.*)$/))) { current.author = m[1].trim(); continue; }
+    if ((m = line.match(/^(?:Highlights|Summary|Text|Content):\s*(.*)$/))) {
+      if (m[1].trim()) body.push(m[1]);
+      continue;
+    }
+    body.push(line);
+  }
+  close();
+  return hits.length ? hits : null;
+}
+
+/* ---- building the cards ---- */
+
+const TITLE_KEYS = ["title", "name", "full_name", "headline"];
+const URL_KEYS = ["url", "link", "html_url", "webpage_url", "permalink"];
+const BODY_KEYS = ["content", "description", "summary", "excerpt", "snippet", "body", "text"];
+//: Fields worth their own line under the title, in the order they read best.
+const META_KEYS = [
+  ["stars", (v) => "★ " + Number(v).toLocaleString()],
+  ["language", (v) => String(v)],
+  ["symbol", (v) => String(v)],
+  ["exchange", (v) => String(v)],
+  ["author", (v) => "by " + v],
+  ["uploader", (v) => "by " + v],
+  ["node_title", (v) => String(v)],
+  ["replies", (v) => v + " replies"],
+  ["replies_count", (v) => v + " replies"],
+  ["duration", duration],
+  ["published", when],
+  ["created", when],
+  ["date", when],
+];
+const SKIP_KEYS = new Set(["id", "node_name", "member", "avatar", "image"]);
+
+function firstOf(record, keys) {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim()) return { key, value };
+  }
+  return null;
+}
+
+function hitCard(record, index) {
+  const keys = Object.keys(record);
+  if (keys.length === 1 && keys[0] === "error") {
+    return `<li class="notice">${inline(String(record.error))}</li>`;
+  }
+
+  const used = new Set(SKIP_KEYS);
+  used.add("replies");                       // rendered in full further down
+  const title = firstOf(record, TITLE_KEYS);
+  if (title) used.add(title.key);
+  const url = firstOf(record, URL_KEYS);
+  if (url) used.add(url.key);
+  const body = firstOf(record, BODY_KEYS);
+  if (body) used.add(body.key);
+
+  const meta = [];
+  META_KEYS.forEach(([key, format]) => {
+    const value = record[key];
+    if (value === undefined || value === null || String(value).trim() === "") return;
+    if (Array.isArray(value)) return;
+    used.add(key);
+    const shown = format(value);
+    if (shown) meta.push(`<span>${esc(shown)}</span>`);
+  });
+
+  // Anything left over is still shown rather than quietly dropped.
+  const extra = Object.entries(record)
+    .filter(([key, value]) => !used.has(key) && value !== null && value !== ""
+                              && typeof value !== "object")
+    .slice(0, 6)
+    .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(String(value).slice(0, 160))}</dd>`);
+
+  const replies = Array.isArray(record.replies)
+    ? record.replies.slice(0, 40).map((reply) =>
+        `<li class="reply"><span class="who">${esc(reply.author || "anonymous")}`
+        + `${reply.created ? " · " + esc(when(reply.created)) : ""}</span>`
+        + `<div class="prose">${prose(reply.content || "")}</div></li>`)
+    : [];
+
+  return `<li class="hit">
+    <span class="hit-n">${index + 1}</span>
+    ${title ? `<h3 class="hit-t">${url ? titleLink(url.value, String(title.value)) : esc(String(title.value))}</h3>` : ""}
+    ${meta.length ? `<div class="hit-m">${meta.join("")}</div>` : ""}
+    ${body ? `<div class="hit-b"><div class="prose">${prose(String(body.value))}</div></div>` : ""}
+    ${extra.length ? `<dl class="hit-x">${extra.join("")}</dl>` : ""}
+    ${url ? linkChip(url.value) : ""}
+    ${replies.length ? `<ol class="replies">${replies.join("")}</ol>` : ""}
+  </li>`;
+}
+
+function renderRecords(records) {
+  const real = records.filter((r) => !(Object.keys(r).length === 1 && r.error));
+  return {
+    html: `<ol class="hits">${records.map(hitCard).join("")}</ol>`,
+    summary: real.length ? `<b>${real.length}</b> result${real.length === 1 ? "" : "s"}` : "",
+  };
+}
+
+function renderExaHits(hits) {
+  const cards = hits.map((hit, index) => {
+    // Exa separates the passages it matched with a line of three dots. Each
+    // passage is a separate quotation, so each gets a block of its own.
+    const passages = String(hit.body || "").split(/\n\s*\.\.\.\s*\n/)
+      .map((part) => part.split("\n").map((line) => line.replace(/^>\s?/, "")).join("\n").trim())
+      .filter(Boolean)
+      .reduce((blocks, part) => {
+        if (blocks.length && part.length < 90) blocks[blocks.length - 1].push(part);
+        else blocks.push([part]);
+        return blocks;
+      }, []);
+    const excerpts = passages.map((parts) =>
+      `<div class="excerpt"><div class="prose">`
+      + parts.map(prose).join('<p class="gap">…</p>')
+      + `</div></div>`);
+    const meta = [];
+    const published = when(hit.published);
+    if (published) meta.push(`<span>${esc(published)}</span>`);
+    if (hit.author && hit.author !== "N/A") meta.push(`<span>by ${esc(hit.author)}</span>`);
+    if (hit.url) meta.push(`<span>${esc(hostOf(hit.url))}</span>`);
+    return `<li class="hit">
+      <span class="hit-n">${index + 1}</span>
+      <h3 class="hit-t">${titleLink(hit.url, hit.title || hit.url || "Untitled")}</h3>
+      ${meta.length ? `<div class="hit-m">${meta.join("")}</div>` : ""}
+      ${excerpts.length ? `<div class="excerpts">${excerpts.join("")}</div>` : ""}
+      ${linkChip(hit.url)}
+    </li>`;
+  });
+  return {
+    html: `<ol class="hits">${cards.join("")}</ol>`,
+    summary: `<b>${hits.length}</b> result${hits.length === 1 ? "" : "s"}`,
+  };
+}
+
+function renderArticle(article) {
+  const meta = [];
+  const published = when(article.published);
+  if (published) meta.push(`<span>${esc(published)}</span>`);
+  const words = article.markdown.trim().split(/\s+/).filter(Boolean).length;
+  if (words) meta.push(`<span>${words.toLocaleString()} words</span>`);
+  return {
+    html: `<article class="doc">
+      <header class="doc-h">
+        <h3>${article.url ? titleLink(article.url, article.title || article.url)
+                          : esc(article.title || "")}</h3>
+        ${meta.length ? `<div class="hit-m">${meta.join("")}</div>` : ""}
+        ${linkChip(article.url)}
+      </header>
+      ${article.warning ? `<p class="notice">${esc(article.warning)}</p>` : ""}
+      <div class="prose">${prose(article.markdown)}</div>
+      ${linkSection(article.markdown)}
+    </article>`,
+    summary: article.url ? esc(hostOf(article.url)) : "",
+  };
+}
+
+function renderVideo(lines, text) {
+  const clean = lines.filter((line) => line.trim());
+  if (clean.length < 4) return renderPlainDoc(text);
+  const [title, uploader, seconds, url] = clean;
+  const rest = clean.slice(4);
+  return {
+    html: `<article class="doc">
+      <header class="doc-h">
+        <h3>${titleLink(url, title)}</h3>
+        <div class="hit-m"><span>by ${esc(uploader)}</span><span>${esc(duration(seconds))}</span></div>
+        ${linkChip(url)}
+      </header>
+      ${rest.length ? `<div class="prose">${prose(rest.join("\n"))}</div>` : ""}
+    </article>`,
+    summary: esc(uploader),
+  };
+}
+
+function renderTranscript(lines, text, running) {
+  // The stream opens with progress notes, then a blank line, then the words.
+  const blank = lines.indexOf("");
+  const notes = blank === -1 ? lines : lines.slice(0, blank);
+  const spoken = (blank === -1 ? (running ? [] : lines) : lines.slice(blank + 1)).join("\n").trim();
+  if (!spoken) return { html: `<p class="hit-n">${esc(notes.join(" "))}</p>`, summary: "" };
+
+  // Whisper returns one unbroken block. Break it into paragraphs so it can be
+  // read — presentation only; "Plain text" still holds the original.
+  let readable = spoken;
+  if (!/\n\s*\n/.test(spoken) && spoken.length > 1200) {
+    const sentences = spoken.replace(/\s+/g, " ")
+      .match(/[^.!?。！？]+[.!?。！？]+["'”’)]*\s*/g) || [spoken];
+    readable = sentences
+      .reduce((acc, sentence, index) => {
+        acc[acc.length - 1] += sentence;
+        if ((index + 1) % 4 === 0) acc.push("");
+        return acc;
+      }, [""])
+      .filter((paragraph) => paragraph.trim())
+      .join("\n\n");
+  }
+  const words = spoken.split(/\s+/).filter(Boolean).length;
+  return {
+    html: `<article class="doc"><div class="prose">${prose(readable)}</div></article>`,
+    summary: `<b>${words.toLocaleString()}</b> words`,
+  };
+}
+
+function renderPlainDoc(text) {
+  return {
+    html: `<article class="doc"><div class="prose">${prose(text)}</div>`
+          + `${linkSection(text, "Links")}</article>`,
+    summary: "",
+  };
+}
+
+/** Pick a shape for whatever arrived. */
+function renderResult(kind, lines, text, running) {
+  if (!text.trim()) return { html: "", summary: "" };
+  if (kind === "transcribe") return renderTranscript(lines, text, running);
+  if (kind === "youtube") return renderVideo(lines, text);
+
+  const records = parseRecords(lines) || parseWholeJson(text);
+  if (records) return renderRecords(records);
+
+  const article = parseArticle(text);
+  if (article) return renderArticle(article);
+
+  const hits = parseExa(text);
+  if (hits) return renderExaHits(hits);
+
+  return renderPlainDoc(text);
+}
+
+/* ─────────── the result panel under each form ─────────── */
+
+const VIEWS = {};
+function viewFor(id, kind) {
+  if (!VIEWS[id]) VIEWS[id] = makeView($(id), kind);
+  return VIEWS[id];
+}
+
+function makeView(mount, kind) {
+  mount.innerHTML =
+    '<div class="res-bar" hidden>'
+    + '<span class="res-sum"></span>'
+    + '<span class="res-acts">'
+    + '<span class="seg">'
+    + '<button type="button" data-view="reading" aria-pressed="true">Reading</button>'
+    + '<button type="button" data-view="plain" aria-pressed="false">Plain text</button>'
+    + '</span>'
+    + '<button type="button" class="mini" data-copy>Copy</button>'
+    + '</span></div>'
+    + '<div class="res-body"></div>'
+    + '<p class="res-note" hidden></p>';
+
+  const bar = mount.querySelector(".res-bar");
+  const summary = mount.querySelector(".res-sum");
+  const body = mount.querySelector(".res-body");
+  const note = mount.querySelector(".res-note");
+  const copyButton = mount.querySelector("[data-copy]");
+  const state = { lines: [], mode: "reading", running: false };
+
+  function text() { return state.lines.join("\n"); }
+
+  function paint() {
+    const raw = text();
+    mount.hidden = false;
+    bar.hidden = !raw.trim();
+
+    if (state.mode === "plain") {
+      const pre = document.createElement("pre");
+      pre.className = "out";
+      pre.textContent = raw;
+      body.replaceChildren(pre);
+      summary.innerHTML = `<b>${state.lines.length}</b> line${state.lines.length === 1 ? "" : "s"}`;
+    } else {
+      const result = renderResult(kind, state.lines, raw, state.running);
+      body.innerHTML = result.html;
+      summary.innerHTML = result.summary;
+    }
+    if (state.running) {
+      const working = document.createElement("div");
+      working.className = "working";
+      working.style.marginTop = raw.trim() ? ".9rem" : "0";
+      working.innerHTML = '<span class="spin"></span>working…';
+      body.appendChild(working);
+    }
+  }
+
+  mount.querySelectorAll("[data-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.mode = button.dataset.view;
+      mount.querySelectorAll("[data-view]").forEach((other) =>
+        other.setAttribute("aria-pressed", String(other === button)));
+      paint();
+    });
+  });
+
+  copyButton.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text().trim());
+      copyButton.textContent = "Copied";
+    } catch { copyButton.textContent = "Copy failed"; }
+    setTimeout(() => { copyButton.textContent = "Copy"; }, 1600);
+  });
+
+  return {
+    start() {
+      state.lines = [];
+      state.running = true;
+      note.hidden = true;
+      note.className = "res-note";
+      paint();
+    },
+    push(lines) {
+      if (!lines || !lines.length) return;
+      state.lines.push(...lines);
+      paint();
+    },
+    finish(message, failed) {
+      state.running = false;
+      paint();
+      note.textContent = message || "";
+      note.className = "res-note" + (failed ? " bad" : "");
+      note.hidden = !message;
+    },
+    /** A message with no result behind it — "type something first". */
+    notice(message) {
+      state.lines = [];
+      state.running = false;
+      mount.hidden = false;
+      bar.hidden = true;
+      body.innerHTML = `<p class="notice">${esc(message)}</p>`;
+      note.hidden = true;
+    },
+    text,
+  };
+}
+
+async function stream(operation, params, view, button) {
+  view.start();
+  if (button) button.disabled = true;
+
+  try {
+    const { job } = await api("/api/run", {
+      method: "POST", body: JSON.stringify({ operation, params }),
+    });
     let since = 0;
     for (;;) {
       const snap = await api(`/api/jobs/${job}?since=${since}`);
       since = snap.next;
-      if (snap.lines.length) {
-        const chunk = snap.lines.join("\n") + "\n";
-        collected += chunk;
-        spinner.insertAdjacentText("beforebegin", chunk);
-        target.scrollTop = target.scrollHeight;
-      }
+      view.push(snap.lines);
       if (snap.status !== "running") {
-        spinner.remove();
-        const note = document.createElement("div");
-        if (snap.status === "error") { note.className = "bad"; note.textContent = "\n" + (snap.error || "Failed"); }
-        else { note.className = "note"; note.textContent = `\n— done in ${snap.elapsed}s`; }
-        target.appendChild(note);
+        if (snap.status === "error") view.finish(snap.error || "Failed", true);
+        else view.finish(`done in ${snap.elapsed}s`, false);
         break;
       }
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   } catch (error) {
-    spinner.remove();
-    const note = document.createElement("div");
-    note.className = "bad"; note.textContent = error.message;
-    target.appendChild(note);
+    view.finish(error.message, true);
   } finally {
     if (button) button.disabled = false;
     refreshQuotas();
   }
-  return collected;
+  return view.text();
 }
 
 async function refreshQuotas() {
@@ -810,40 +1482,37 @@ function renderExamples() {
 }
 
 $("goSearch").addEventListener("click", () => {
+  const view = viewFor("searchOut", "search");
   const query = $("q").value.trim();
-  if (!query) { $("searchOut").textContent = "Type something to search for."; return; }
+  if (!query) { view.notice("Type something to search for."); return; }
   stream("search", { platform: $("source").value, query, limit: Number($("limit").value) || 10 },
-         $("searchOut"), $("goSearch"));
+         view, $("goSearch"));
 });
 $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goSearch").click(); });
 
 $("goRead").addEventListener("click", () => {
+  const view = viewFor("readOut", "read");
   const url = $("readUrl").value.trim();
-  if (!url) { $("readOut").textContent = "Paste an address first."; return; }
-  stream("read", { url }, $("readOut"), $("goRead"));
+  if (!url) { view.notice("Paste an address first."); return; }
+  stream("read", { url }, view, $("goRead"));
 });
 $("readUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goRead").click(); });
 
 $("goYt").addEventListener("click", () => {
+  const view = viewFor("ytOut", "youtube");
   const url = $("ytUrl").value.trim();
-  if (!url) { $("ytOut").textContent = "Paste a YouTube address first."; return; }
-  stream("youtube", { url }, $("ytOut"), $("goYt"));
+  if (!url) { view.notice("Paste a YouTube address first."); return; }
+  stream("youtube", { url }, view, $("goYt"));
 });
 $("ytUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goYt").click(); });
 
-let transcript = "";
-$("goTr").addEventListener("click", async () => {
+$("goTr").addEventListener("click", () => {
+  const view = viewFor("trOut", "transcribe");
   const url = $("trUrl").value.trim();
-  if (!url) { $("trOut").textContent = "Paste an address first."; return; }
-  $("copyTr").disabled = true;
-  transcript = await stream("transcribe", { url }, $("trOut"), $("goTr"));
-  $("copyTr").disabled = !transcript.trim();
+  if (!url) { view.notice("Paste an address first."); return; }
+  stream("transcribe", { url }, view, $("goTr"));
 });
-$("copyTr").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText(transcript.trim()); $("copyTr").textContent = "Copied"; }
-  catch { $("copyTr").textContent = "Copy failed"; }
-  setTimeout(() => { $("copyTr").textContent = "Copy text"; }, 1600);
-});
+$("trUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goTr").click(); });
 
 function esc(v) {
   return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")

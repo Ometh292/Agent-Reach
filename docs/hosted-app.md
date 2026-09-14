@@ -89,6 +89,25 @@ page says this plainly rather than implying they are merely unconfigured.
 IPs aggressively, so requests from any hosted provider fail intermittently. A
 residential proxy largely fixes it. Transcription inherits the same limitation.
 
+## How results are shown
+
+Each source answers in its own shape — Exa returns labelled blocks, GitHub and
+V2EX return one JSON object per line, the web reader returns Markdown, yt-dlp
+prints four fields. The page detects which it received and renders **one card
+per result**, with the title and address as real links and a separate list of
+every link found in a page it read.
+
+Two things follow from that, and both are deliberate:
+
+* **"Plain text" is always one click away**, and shows exactly what the server
+  sent, unaltered. Copy takes that same text, not the rendered version.
+* **Images in a page are named, never loaded.** Fetching one would tell the
+  site being read the address of the person reading it. The address is listed
+  instead, so nothing is hidden.
+
+Fetched content is escaped before it becomes HTML, and only `http` and `https`
+links are ever rendered as links.
+
 ## Connecting your own account (session-only)
 
 Some platforms only serve content to someone signed in. Rather than storing
