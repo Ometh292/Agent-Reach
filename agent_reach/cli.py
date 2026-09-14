@@ -173,6 +173,13 @@ def main():
     # ── watch ──
     sub.add_parser("watch", help="Quick health check + update check (for scheduled tasks)")
 
+    # ── ui ──
+    p_ui = sub.add_parser("ui", help="Open the local web console in a browser")
+    p_ui.add_argument("--port", type=int, default=8765,
+                      help="Port to listen on (default: 8765)")
+    p_ui.add_argument("--no-browser", action="store_true",
+                      help="Print the URL instead of opening a browser")
+
     # ── version ──
     sub.add_parser("version", help="Show version")
 
@@ -246,6 +253,8 @@ def main():
         _cmd_format(args)
     elif args.command == "transcribe":
         _cmd_transcribe(args)
+    elif args.command == "ui":
+        _cmd_ui(args)
 
 
 # ── Command handlers ────────────────────────────────
@@ -1580,6 +1589,17 @@ def _cmd_configure(args):
     elif args.key == "openai-key":
         config.set("openai_api_key", value)
         print("✅ OpenAI key configured!")
+
+
+def _cmd_ui(args):
+    """Start the loopback web console.
+
+    The server binds 127.0.0.1 only and mints a fresh session token on every
+    start; see agent_reach.webui.server for the full threat model.
+    """
+    from agent_reach.webui.server import serve
+
+    serve(port=args.port, open_browser=not args.no_browser)
 
 
 def _cmd_transcribe(args):

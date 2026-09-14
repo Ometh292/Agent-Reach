@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="agent-reach-token" content="__AGENT_REACH_TOKEN__">
+<title>Agent Reach Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F5F7F9; --raised:#FFF; --sunk:#ECEFF3;
+    --ink:#171B22; --ink-soft:#414B5A; --ink-faint:#6E7887;
+    --rule:#D8DEE6; --rule-strong:#BCC5D0;
+    --accent:#1F5E8C; --accent-ink:#FFF; --accent-soft:#E3EDF5;
+    --ready:#2C6E49; --ready-bg:#E4EFE8;
+    --attn:#8A5A12;  --attn-bg:#F6EEDE;
+    --alert:#9B2C2C; --alert-bg:#F7E6E6;
+    --idle:#5A6270;  --idle-bg:#E8EBEF;
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --serif:"Newsreader",ui-serif,Georgia,serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    --s--1:.8125rem; --s-0:1rem; --s-1:1.2rem; --s-2:1.45rem; --s-3:1.9rem;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --paper:#12151A; --raised:#1A1F26; --sunk:#0D1014;
+    --ink:#E6EAF0; --ink-soft:#AEB8C6; --ink-faint:#7D8795;
+    --rule:#2A3140; --rule-strong:#3B4453;
+    --accent:#7FB2D8; --accent-ink:#0D1014; --accent-soft:#1B2A38;
+    --ready:#7DC49B; --ready-bg:#172A20;
+    --attn:#D9AE66;  --attn-bg:#2B2415;
+    --alert:#E08585; --alert-bg:#2E1A1A;
+    --idle:#9AA3B1;  --idle-bg:#1E232B;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#12151A; --raised:#1A1F26; --sunk:#0D1014;
+    --ink:#E6EAF0; --ink-soft:#AEB8C6; --ink-faint:#7D8795;
+    --rule:#2A3140; --rule-strong:#3B4453;
+    --accent:#7FB2D8; --accent-ink:#0D1014; --accent-soft:#1B2A38;
+    --ready:#7DC49B; --ready-bg:#172A20;
+    --attn:#D9AE66;  --attn-bg:#2B2415;
+    --alert:#E08585; --alert-bg:#2E1A1A;
+    --idle:#9AA3B1;  --idle-bg:#1E232B;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:var(--s-0);line-height:1.6;-webkit-font-smoothing:antialiased}
+  [hidden]{display:none!important}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+  /* ---------- chrome ---------- */
+  .top{background:var(--raised);border-bottom:1px solid var(--rule);
+    position:sticky;top:0;z-index:20}
+  .top-in{max-width:78rem;margin:0 auto;padding:.85rem 20px;display:flex;
+    flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between}
+  .logo{font-family:var(--serif);font-weight:600;font-size:var(--s-2);margin:0}
+  .logo small{font-family:var(--mono);font-size:.7rem;color:var(--ink-faint);
+    letter-spacing:.06em;margin-left:.5rem;font-weight:400}
+  .health{display:flex;gap:.5rem;align-items:center;font-size:var(--s--1);
+    font-family:var(--mono);color:var(--ink-soft)}
+  .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--idle);flex:none}
+  .dot.on{background:var(--ready)} .dot.off{background:var(--alert)}
+
+  nav{background:var(--raised);border-bottom:1px solid var(--rule)}
+  .tabs{max-width:78rem;margin:0 auto;padding:0 20px;display:flex;gap:.25rem;
+    overflow-x:auto}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;
+    padding:.7rem .85rem;font:inherit;font-size:var(--s--1);font-weight:500;
+    color:var(--ink-faint);cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+
+  main{max-width:78rem;margin:0 auto;padding:2rem 20px 5rem}
+  h2{font-family:var(--serif);font-weight:600;font-size:var(--s-2);margin:0 0 .2rem}
+  .hint{color:var(--ink-soft);font-size:var(--s--1);margin:0 0 1.25rem;max-width:64ch}
+
+  /* ---------- controls ---------- */
+  label{display:grid;gap:.3rem;font-size:var(--s--1);font-weight:500}
+  input[type=text],input[type=url],input[type=password],select,textarea{
+    font:inherit;font-size:var(--s--1);color:var(--ink);background:var(--raised);
+    border:1px solid var(--rule-strong);border-radius:4px;padding:.5rem .65rem;
+    width:100%;max-width:100%}
+  textarea{font-family:var(--mono);min-height:6rem;resize:vertical;line-height:1.5}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
+    box-shadow:0 0 0 3px var(--accent-soft)}
+  button{font:inherit;cursor:pointer;border-radius:4px;border:1px solid transparent}
+  .btn{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);
+    padding:.5rem .95rem;font-size:var(--s--1);font-weight:500}
+  .btn:hover:not(:disabled){filter:brightness(1.08)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-q{background:transparent;color:var(--ink-soft);border-color:var(--rule-strong);
+    padding:.42rem .8rem;font-size:var(--s--1)}
+  .btn-q:hover:not(:disabled){color:var(--ink);border-color:var(--ink-faint)}
+  .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end}
+  .row > label{flex:1 1 14rem;min-width:0}
+  .row > label.grow{flex:3 1 22rem}
+
+  .card{background:var(--raised);border:1px solid var(--rule);border-radius:6px;
+    padding:1.15rem}
+  .cards{display:grid;gap:1rem}
+
+  /* ---------- status ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));
+    gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:6px;
+    overflow:hidden;margin-bottom:1.5rem}
+  .tile{background:var(--raised);padding:.9rem 1rem}
+  .tile .n{font-family:var(--mono);font-size:var(--s-3);line-height:1;display:block;
+    font-variant-numeric:tabular-nums;margin-bottom:.3rem}
+  .tile .k{font-size:var(--s--1);color:var(--ink-soft);display:block}
+  .tile.ok .n{color:var(--ready)} .tile.warn .n{color:var(--attn)}
+  .tile.off .n{color:var(--idle)} .tile.error .n{color:var(--alert)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:.6rem}
+  .ch{background:var(--raised);border:1px solid var(--rule);border-radius:5px;
+    padding:.7rem .85rem;border-left:3px solid var(--idle)}
+  .ch[data-s=ok]{border-left-color:var(--ready)}
+  .ch[data-s=warn]{border-left-color:var(--attn)}
+  .ch[data-s=error]{border-left-color:var(--alert)}
+  .ch-h{display:flex;gap:.5rem;justify-content:space-between;align-items:baseline}
+  .ch-n{font-weight:600;font-size:var(--s--1)}
+  .ch-b{font-family:var(--mono);font-size:.7rem;color:var(--ink-faint);display:block;
+    margin-top:.15rem}
+  /* Clamp to three lines rather than scrolling inside the card: a nested
+     scrollbar per card reads as broken, and long prescriptions with URLs
+     produced a horizontal one too. */
+  .ch-m{font-size:.78rem;color:var(--ink-soft);margin:.4rem 0 0;line-height:1.45;
+    white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+  .ch-m.open{display:block;-webkit-line-clamp:unset}
+  .more{background:none;border:none;padding:.2rem 0 0;font:inherit;
+    font-size:.72rem;font-family:var(--mono);color:var(--accent);cursor:pointer;
+    text-decoration:underline;text-underline-offset:2px}
+  .pill{font-family:var(--mono);font-size:.67rem;font-weight:500;letter-spacing:.05em;
+    text-transform:uppercase;padding:.13em .45em;border-radius:2px;
+    border:1px solid currentColor;white-space:nowrap;flex:none}
+  .pill.ok{color:var(--ready);background:var(--ready-bg)}
+  .pill.warn{color:var(--attn);background:var(--attn-bg)}
+  .pill.off{color:var(--idle);background:var(--idle-bg)}
+  .pill.error{color:var(--alert);background:var(--alert-bg)}
+
+  /* ---------- console output ---------- */
+  .out{background:var(--sunk);border:1px solid var(--rule);border-radius:5px;
+    font-family:var(--mono);font-size:var(--s--1);line-height:1.55;padding:.85rem 1rem;
+    max-height:34rem;overflow:auto;white-space:pre-wrap;word-break:break-word;
+    margin-top:1rem;color:var(--ink)}
+  .out:empty{display:none}
+  .out .meta{color:var(--ink-faint)}
+  .out .err{color:var(--alert)}
+  .out .ok{color:var(--ready)}
+  .running{display:inline-flex;gap:.45rem;align-items:center;font-size:var(--s--1);
+    color:var(--ink-soft);font-family:var(--mono)}
+  .spin{width:.7rem;height:.7rem;border:2px solid var(--rule-strong);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+  .msg{font-size:var(--s--1);padding:.55rem .75rem;border-radius:4px;
+    border:1px solid currentColor;margin-top:.75rem}
+  .msg.err{color:var(--alert);background:var(--alert-bg)}
+  .msg.ok{color:var(--ready);background:var(--ready-bg)}
+
+  /* ---------- tools + settings ---------- */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:.4rem 1rem;font-size:var(--s--1);
+    font-family:var(--mono)}
+  .kv dt{color:var(--ink-soft)}
+  .kv dd{margin:0}
+  .tool-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(9rem,1fr));
+    gap:.4rem}
+  .tool{display:flex;gap:.45rem;align-items:center;font-family:var(--mono);
+    font-size:var(--s--1);background:var(--sunk);border:1px solid var(--rule);
+    border-radius:4px;padding:.35rem .55rem}
+  .secret-note{font-size:.75rem;color:var(--ink-faint);margin:.4rem 0 0;line-height:1.45}
+  fieldset{border:1px solid var(--rule);border-radius:5px;padding:1rem;margin:0 0 1rem}
+  legend{font-size:var(--s--1);font-weight:600;padding:0 .4rem}
+  .chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+  .chip{display:inline-flex;gap:.35rem;align-items:center;font-size:var(--s--1);
+    background:var(--sunk);border:1px solid var(--rule);border-radius:99px;
+    padding:.25rem .7rem;cursor:pointer}
+  .chip input{margin:0;accent-color:var(--accent)}
+
+  @media (max-width:34rem){
+    :root{--s-3:1.55rem;--s-2:1.25rem}
+    .top-in{flex-direction:column;align-items:flex-start;gap:.5rem}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <h1 class="logo">Agent Reach <small id="ver"></small></h1>
+    <div class="health"><span class="dot" id="dot"></span><span id="healthText">connecting…</span></div>
+  </div>
+</header>
+
+<nav>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-panel="dash"      aria-selected="true">Dashboard</button>
+    <button class="tab" role="tab" data-panel="search"    aria-selected="false">Search</button>
+    <button class="tab" role="tab" data-panel="read"      aria-selected="false">Read a page</button>
+    <button class="tab" role="tab" data-panel="trending"  aria-selected="false">Trending</button>
+    <button class="tab" role="tab" data-panel="transcribe" aria-selected="false">Transcribe</button>
+    <button class="tab" role="tab" data-panel="setup"     aria-selected="false">Setup</button>
+    <button class="tab" role="tab" data-panel="settings"  aria-selected="false">Settings</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ═══════════ dashboard ═══════════ -->
+  <section id="p-dash" class="panel">
+    <h2>Platform status</h2>
+    <p class="hint">Live from <code>agent-reach doctor</code>. A platform is marked Ready only
+      when that has been proven — checks that would write credentials or read your browser are
+      deliberately skipped, so “Action needed” often means “installed, just not verified”.</p>
+    <div class="row" style="margin-bottom:1.25rem">
+      <button class="btn" id="refreshStatus">Refresh</button>
+      <span id="statusSpin" hidden class="running"><span class="spin"></span>checking…</span>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid" id="channels"></div>
+  </section>
+
+  <!-- ═══════════ search ═══════════ -->
+  <section id="p-search" class="panel" hidden>
+    <h2>Search</h2>
+    <p class="hint">Runs the platform's own tool and shows its raw output.</p>
+    <div class="card">
+      <div class="row">
+        <label class="grow" for="q">What are you looking for?
+          <input type="text" id="q" placeholder="e.g. local-first software" autocomplete="off">
+        </label>
+        <label for="platform">Platform
+          <select id="platform"></select>
+        </label>
+        <label for="limit" style="flex:0 0 6rem">Results
+          <input type="text" id="limit" value="10" inputmode="numeric">
+        </label>
+        <button class="btn" id="runSearch">Search</button>
+      </div>
+      <div class="out" id="searchOut"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ read ═══════════ -->
+  <section id="p-read" class="panel" hidden>
+    <h2>Read a page</h2>
+    <p class="hint">Paste any URL. YouTube links return video details and subtitles;
+      V2EX threads return the post and replies; everything else is read as clean text.</p>
+    <div class="card">
+      <div class="row">
+        <label class="grow" for="readUrl">URL
+          <input type="url" id="readUrl" placeholder="https://example.com/article" autocomplete="off">
+        </label>
+        <button class="btn" id="runRead">Read</button>
+      </div>
+      <div class="out" id="readOut"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ trending ═══════════ -->
+  <section id="p-trending" class="panel" hidden>
+    <h2>Trending</h2>
+    <p class="hint">Listing views that need no search term.</p>
+    <div class="card">
+      <div class="row">
+        <label for="feed">Feed
+          <select id="feed">
+            <option value="v2ex_hot">V2EX — hot topics</option>
+            <option value="bilibili_hot">B站 — trending videos</option>
+            <option value="xueqiu_hot_posts">雪球 — hot posts</option>
+            <option value="xueqiu_hot_stocks">雪球 — hot stocks</option>
+          </select>
+        </label>
+        <label for="feedLimit" style="flex:0 0 6rem">Items
+          <input type="text" id="feedLimit" value="20" inputmode="numeric">
+        </label>
+        <button class="btn" id="runFeed">Load</button>
+      </div>
+      <div class="out" id="feedOut"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ transcribe ═══════════ -->
+  <section id="p-transcribe" class="panel" hidden>
+    <h2>Transcribe audio</h2>
+    <p class="hint">Downloads the audio, splits it, and sends it to Whisper. Needs a Groq or
+      OpenAI key under Settings, plus <code>ffmpeg</code>. Long videos take several minutes.</p>
+    <div class="card">
+      <div class="row">
+        <label class="grow" for="trUrl">Video or podcast URL
+          <input type="url" id="trUrl" placeholder="https://youtu.be/…" autocomplete="off">
+        </label>
+        <label for="trProvider">Provider
+          <select id="trProvider">
+            <option value="auto">Auto</option>
+            <option value="groq">Groq</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </label>
+        <button class="btn" id="runTranscribe">Transcribe</button>
+        <button class="btn-q" id="copyTranscript" disabled>Copy text</button>
+      </div>
+      <div class="out" id="trOut"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ setup ═══════════ -->
+  <section id="p-setup" class="panel" hidden>
+    <h2>Setup</h2>
+    <p class="hint">Install the upstream tools. <strong>Check only</strong> changes nothing —
+      run it first to see what is missing.</p>
+    <div class="cards">
+      <div class="card">
+        <fieldset>
+          <legend>Optional channels</legend>
+          <div class="chips" id="chanChips"></div>
+        </fieldset>
+        <div class="row">
+          <label for="mode">Mode
+            <select id="mode">
+              <option value="safe">Check only — no changes</option>
+              <option value="dry-run">Dry run — show what would happen</option>
+              <option value="system">Install — make changes</option>
+            </select>
+          </label>
+          <button class="btn" id="runInstall">Run</button>
+          <button class="btn-q" id="runSkill">Reinstall agent skill</button>
+          <button class="btn-q" id="runUpdate">Check for updates</button>
+        </div>
+        <div class="out" id="setupOut"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:var(--s-1)">Installed tools</h2>
+        <p class="hint" style="margin-bottom:.85rem">What Agent Reach can find on this machine.</p>
+        <div class="tool-list" id="toolList"></div>
+        <button class="btn-q" id="refreshTools" style="margin-top:.85rem">Refresh</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ settings ═══════════ -->
+  <section id="p-settings" class="panel" hidden>
+    <h2>Settings</h2>
+    <p class="hint">Saved to <code id="cfgPath">~/.agent-reach/config.yaml</code> on this machine,
+      with owner-only permissions. Existing secrets are shown as
+      <code>[REDACTED]</code> — this page can write them but never reads them back.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="row">
+          <label for="cfgKey">Setting
+            <select id="cfgKey">
+              <option value="groq-key">Groq API key — audio transcription</option>
+              <option value="openai-key">OpenAI API key — transcription fallback</option>
+              <option value="github-token">GitHub token — higher rate limits</option>
+              <option value="twitter-cookies">Twitter cookies — Cookie-Editor export</option>
+              <option value="proxy">Network proxy</option>
+              <option value="youtube-cookies">YouTube cookie source — browser name</option>
+            </select>
+          </label>
+        </div>
+        <label for="cfgVal" style="margin-top:.7rem">Value
+          <textarea id="cfgVal" placeholder="Paste the value here" spellcheck="false"></textarea>
+        </label>
+        <p class="secret-note" id="cfgNote"></p>
+        <div class="row" style="margin-top:.7rem">
+          <button class="btn" id="saveCfg">Save</button>
+          <button class="btn-q" id="clearCfgVal">Clear box</button>
+        </div>
+        <div id="cfgMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:var(--s-1)">Current configuration</h2>
+        <p class="hint" style="margin-bottom:.85rem">Secrets are masked at the source.</p>
+        <dl class="kv" id="cfgList"></dl>
+        <button class="btn-q" id="refreshCfg" style="margin-top:.85rem">Refresh</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+"use strict";
+
+const TOKEN = document.querySelector('meta[name="agent-reach-token"]').content;
+const $ = (id) => document.getElementById(id);
+
+/* ───────────────────────── transport ───────────────────────── */
+
+async function run(operation, params = {}) {
+  const response = await fetch("/api/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Agent-Reach-Token": TOKEN },
+    body: JSON.stringify({ operation, params }),
+  });
+  const data = await response.json().catch(() => ({ error: "Malformed response" }));
+  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+  return data;
+}
+
+async function getJob(id, since) {
+  const response = await fetch(`/api/jobs/${id}/${since}`, {
+    headers: { "X-Agent-Reach-Token": TOKEN },
+  });
+  const data = await response.json().catch(() => ({ error: "Malformed response" }));
+  if (!response.ok) throw new Error(data.error || "Job lookup failed");
+  return data;
+}
+
+/** Start a streaming operation and pipe its output into `target`. */
+async function stream(operation, params, target, button) {
+  target.textContent = "";
+  if (button) button.disabled = true;
+  const spinner = document.createElement("div");
+  spinner.className = "running";
+  spinner.innerHTML = '<span class="spin"></span>working…';
+  target.appendChild(spinner);
+
+  let finalText = "";
+  try {
+    const { job } = await run(operation, params);
+    let since = 0;
+    for (;;) {
+      const snap = await getJob(job, since);
+      since = snap.next;
+      if (snap.lines.length) {
+        const chunk = snap.lines.join("\n") + "\n";
+        finalText += chunk;
+        spinner.insertAdjacentText("beforebegin", chunk);
+        target.scrollTop = target.scrollHeight;
+      }
+      if (snap.status !== "running") {
+        spinner.remove();
+        const note = document.createElement("div");
+        if (snap.status === "error") {
+          note.className = "err";
+          note.textContent = "\n✕ " + (snap.error || "Failed");
+        } else {
+          note.className = "meta";
+          note.textContent = `\n— finished in ${snap.elapsed}s`;
+        }
+        target.appendChild(note);
+        target.scrollTop = target.scrollHeight;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 450));
+    }
+  } catch (error) {
+    spinner.remove();
+    const note = document.createElement("div");
+    note.className = "err";
+    note.textContent = "✕ " + error.message;
+    target.appendChild(note);
+  } finally {
+    if (button) button.disabled = false;
+  }
+  return finalText;
+}
+
+/* ───────────────────────── tabs ───────────────────────── */
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", "false"));
+    document.querySelectorAll(".panel").forEach((p) => { p.hidden = true; });
+    tab.setAttribute("aria-selected", "true");
+    $("p-" + tab.dataset.panel).hidden = false;
+  });
+});
+
+/* ───────────────────────── dashboard ───────────────────────── */
+
+const STATUS_LABEL = { ok: "Ready", warn: "Action needed", off: "Not installed", error: "Error" };
+
+async function loadStatus() {
+  $("statusSpin").hidden = false;
+  try {
+    const { result } = await run("status");
+    renderStatus(result);
+    $("dot").className = "dot on";
+    $("healthText").textContent = `${result.active}/${result.total} ready`;
+  } catch (error) {
+    $("dot").className = "dot off";
+    $("healthText").textContent = "offline";
+    $("channels").innerHTML =
+      `<p class="msg err">Could not reach the Agent Reach service: ${escapeHtml(error.message)}</p>`;
+  } finally {
+    $("statusSpin").hidden = true;
+  }
+}
+
+function renderStatus(result) {
+  const counts = { ok: 0, warn: 0, off: 0, error: 0 };
+  Object.values(result.channels).forEach((c) => {
+    if (counts[c.status] === undefined) counts.warn++; else counts[c.status]++;
+  });
+  const tiles = [
+    ["ok", counts.ok, "Ready to use"],
+    ["warn", counts.warn, "Need a login or key"],
+    ["off", counts.off, "Not installed"],
+  ];
+  if (counts.error) tiles.push(["error", counts.error, "Reporting an error"]);
+  $("tiles").innerHTML = tiles.map(([cls, n, k]) =>
+    `<div class="tile ${cls}"><span class="n">${n}</span><span class="k">${k}</span></div>`).join("");
+
+  $("channels").innerHTML = Object.entries(result.channels).map(([id, c]) => {
+    const status = STATUS_LABEL[c.status] ? c.status : "warn";
+    const backend = c.active_backend || (c.backends || []).join(" · ") || "built in";
+    return `<article class="ch" data-s="${status}">
+        <div class="ch-h">
+          <span class="ch-n">${escapeHtml(c.name || id)}</span>
+          <span class="pill ${status}">${STATUS_LABEL[status]}</span>
+        </div>
+        <span class="ch-b">${escapeHtml(backend)}</span>
+        <p class="ch-m">${escapeHtml(c.message || "")}</p>
+      </article>`;
+  }).join("");
+
+  // Only clipped messages get a toggle — an always-present "more" that does
+  // nothing is worse than none at all.
+  $("channels").querySelectorAll(".ch-m").forEach((message) => {
+    if (message.scrollHeight <= message.clientHeight + 1) return;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "more";
+    toggle.textContent = "show more";
+    toggle.addEventListener("click", () => {
+      const open = message.classList.toggle("open");
+      toggle.textContent = open ? "show less" : "show more";
+    });
+    message.insertAdjacentElement("afterend", toggle);
+  });
+}
+
+$("refreshStatus").addEventListener("click", loadStatus);
+
+/* ───────────────────────── search / read / trending ───────────────────────── */
+
+$("runSearch").addEventListener("click", () => {
+  const query = $("q").value.trim();
+  if (!query) { $("searchOut").textContent = "Enter something to search for."; return; }
+  stream("search", {
+    platform: $("platform").value,
+    query,
+    limit: Number($("limit").value) || 10,
+  }, $("searchOut"), $("runSearch"));
+});
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("runSearch").click(); });
+
+$("runRead").addEventListener("click", () => {
+  const url = $("readUrl").value.trim();
+  if (!url) { $("readOut").textContent = "Paste a URL first."; return; }
+  stream("read", { url }, $("readOut"), $("runRead"));
+});
+$("readUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("runRead").click(); });
+
+$("runFeed").addEventListener("click", () => {
+  stream("browse", {
+    feed: $("feed").value,
+    limit: Number($("feedLimit").value) || 20,
+  }, $("feedOut"), $("runFeed"));
+});
+
+/* ───────────────────────── transcribe ───────────────────────── */
+
+let lastTranscript = "";
+$("runTranscribe").addEventListener("click", async () => {
+  const url = $("trUrl").value.trim();
+  if (!url) { $("trOut").textContent = "Paste a video or podcast URL first."; return; }
+  $("copyTranscript").disabled = true;
+  lastTranscript = await stream("transcribe", {
+    url, provider: $("trProvider").value,
+  }, $("trOut"), $("runTranscribe"));
+  $("copyTranscript").disabled = !lastTranscript.trim();
+});
+
+$("copyTranscript").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(lastTranscript.trim());
+    $("copyTranscript").textContent = "Copied";
+    setTimeout(() => { $("copyTranscript").textContent = "Copy text"; }, 1600);
+  } catch {
+    $("copyTranscript").textContent = "Copy failed";
+    setTimeout(() => { $("copyTranscript").textContent = "Copy text"; }, 1600);
+  }
+});
+
+/* ───────────────────────── setup ───────────────────────── */
+
+const CHANNEL_CHOICES = [
+  ["opencli", "Browser bridge (Reddit, FB, IG, 小红书)"],
+  ["twitter", "Twitter / X"],
+  ["bilibili", "B站"],
+  ["xiaoyuzhou", "小宇宙 podcasts"],
+  ["reddit", "Reddit"],
+  ["xiaohongshu", "小红书"],
+];
+
+$("chanChips").innerHTML = CHANNEL_CHOICES.map(([id, label]) =>
+  `<label class="chip"><input type="checkbox" value="${id}" id="chan-${id}">${escapeHtml(label)}</label>`
+).join("");
+
+$("runInstall").addEventListener("click", () => {
+  const channels = CHANNEL_CHOICES
+    .map(([id]) => id).filter((id) => $("chan-" + id).checked);
+  stream("install", { mode: $("mode").value, channels }, $("setupOut"), $("runInstall"));
+});
+
+$("runSkill").addEventListener("click", () =>
+  stream("skill", { action: "install" }, $("setupOut"), $("runSkill")));
+$("runUpdate").addEventListener("click", () =>
+  stream("check_update", {}, $("setupOut"), $("runUpdate")));
+
+async function loadTools() {
+  try {
+    const { result } = await run("tools");
+    $("toolList").innerHTML = Object.entries(result.tools).map(([name, present]) =>
+      `<span class="tool"><span class="dot ${present ? "on" : "off"}"></span>${escapeHtml(name)}</span>`
+    ).join("");
+  } catch (error) {
+    $("toolList").innerHTML = `<p class="msg err">${escapeHtml(error.message)}</p>`;
+  }
+}
+$("refreshTools").addEventListener("click", loadTools);
+
+/* ───────────────────────── settings ───────────────────────── */
+
+const CFG_NOTES = {
+  "groq-key": "Free tier at console.groq.com. Used for audio transcription.",
+  "openai-key": "Only needed as a fallback when Groq is unavailable.",
+  "github-token": "A token with no scopes is enough — it only raises rate limits.",
+  "twitter-cookies": "Paste the Cookie-Editor “Header String” export from x.com, or auth_token and ct0 separated by a space.",
+  "proxy": "Format: http://user:pass@host:port. Used by agents for networks that block certain platforms.",
+  "youtube-cookies": "A browser name such as chrome or firefox — used for age-restricted videos.",
+};
+
+function updateCfgNote() { $("cfgNote").textContent = CFG_NOTES[$("cfgKey").value] || ""; }
+$("cfgKey").addEventListener("change", updateCfgNote);
+$("clearCfgVal").addEventListener("click", () => { $("cfgVal").value = ""; });
+
+$("saveCfg").addEventListener("click", async () => {
+  const value = $("cfgVal").value.trim();
+  $("cfgMsg").innerHTML = "";
+  if (!value) { $("cfgMsg").innerHTML = '<p class="msg err">Enter a value first.</p>'; return; }
+  $("saveCfg").disabled = true;
+  try {
+    const { result } = await run("config.set", { key: $("cfgKey").value, value });
+    $("cfgVal").value = "";           // never leave a secret sitting in the DOM
+    $("cfgMsg").innerHTML =
+      `<p class="msg ok">Saved ${escapeHtml(result.saved)}.${result.note ? " " + escapeHtml(result.note) : ""}</p>`;
+    loadConfig(); loadStatus();
+  } catch (error) {
+    $("cfgMsg").innerHTML = `<p class="msg err">${escapeHtml(error.message)}</p>`;
+  } finally {
+    $("saveCfg").disabled = false;
+  }
+});
+
+async function loadConfig() {
+  try {
+    const { result } = await run("config.get");
+    $("cfgPath").textContent = result.path;
+    const entries = Object.entries(result.values);
+    $("cfgList").innerHTML = entries.length
+      ? entries.map(([k, v]) =>
+          `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v === null ? "—" : String(v))}</dd>`).join("")
+      : '<dt>—</dt><dd>nothing configured yet</dd>';
+  } catch (error) {
+    $("cfgList").innerHTML = `<dt class="err">error</dt><dd>${escapeHtml(error.message)}</dd>`;
+  }
+}
+$("refreshCfg").addEventListener("click", loadConfig);
+
+/* ───────────────────────── boot ───────────────────────── */
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+(async function boot() {
+  // Drop the token from the address bar so it is not copied or kept in history.
+  if (location.search.includes("token=")) {
+    history.replaceState(null, "", location.pathname);
+  }
+  try {
+    const response = await fetch("/api/meta", { headers: { "X-Agent-Reach-Token": TOKEN } });
+    const meta = await response.json();
+    $("ver").textContent = "v" + meta.version;
+    $("platform").innerHTML = Object.entries(meta.platforms)
+      .map(([id, label]) => `<option value="${id}">${escapeHtml(label)}</option>`).join("");
+  } catch {
+    $("ver").textContent = "";
+  }
+  updateCfgNote();
+  loadStatus();
+  loadTools();
+  loadConfig();
+})();
+</script>
+</body>
+</html>
