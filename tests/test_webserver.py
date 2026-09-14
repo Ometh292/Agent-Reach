@@ -343,17 +343,31 @@ def test_unconfigured_deployment_reports_503_not_a_crash():
 # status honesty
 # --------------------------------------------------------------------------- #
 
-def test_status_marks_desktop_only_channels_unavailable():
+def test_status_marks_only_truly_desktop_only_channels_unavailable():
+    """Facebook and Instagram have no server-capable backend in this codebase.
+
+    Reddit and 小红书 deliberately are NOT in this list: they have rdt-cli and
+    xiaohongshu-mcp respectively, both of which run on a server from a saved
+    cookie. Calling them impossible would be inaccurate — they are withheld by
+    policy, not blocked by architecture.
+    """
     channels = {c["id"]: c for c in ops.compute_status()}
-    for channel_id in ("reddit", "facebook", "instagram", "xiaohongshu"):
+    for channel_id in ("facebook", "instagram"):
         assert channels[channel_id]["state"] == "unavailable", channel_id
         assert channels[channel_id]["detail"], channel_id
 
 
 def test_status_marks_credential_channels_as_needing_an_account():
     channels = {c["id"]: c for c in ops.compute_status()}
-    for channel_id in ("twitter", "xueqiu", "linkedin"):
+    for channel_id in ("twitter", "xueqiu", "linkedin", "reddit", "xiaohongshu"):
         assert channels[channel_id]["state"] == "needs_account", channel_id
+
+
+def test_server_capable_channels_are_not_described_as_impossible():
+    """Reddit and 小红书 have documented server backends; say so honestly."""
+    channels = {c["id"]: c for c in ops.compute_status()}
+    for channel_id in ("reddit", "xiaohongshu"):
+        assert "Possible on a server" in channels[channel_id]["detail"], channel_id
 
 
 def test_status_never_claims_a_channel_is_connected_without_evidence():

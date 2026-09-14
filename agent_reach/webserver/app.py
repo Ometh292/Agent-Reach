@@ -37,6 +37,23 @@ from agent_reach.webserver.rate_limit import RateLimiter, budgets_from_env
 from agent_reach.webserver.routes import router
 
 
+def _load_dotenv_if_present() -> None:
+    """Load a local .env when running outside a platform that injects env vars.
+
+    Render and other hosts set real environment variables, where no .env file
+    exists and this does nothing — so local and production read configuration
+    through exactly the same path. Existing variables always win.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:                              # pragma: no cover
+        return
+    load_dotenv(override=False)
+
+
+_load_dotenv_if_present()
+
+
 @dataclass(frozen=True)
 class Settings:
     supabase_url: str

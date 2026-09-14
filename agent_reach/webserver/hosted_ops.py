@@ -328,21 +328,40 @@ def _transcribe_stream(url: str) -> Iterator[str]:
 #:   needs_account — needs the end user's own login; not offered here
 #:   unavailable — cannot work in a hosted environment at all
 _STATIC_CHANNELS = [
+    # Could run on a server with the user's own credentials. Not offered here
+    # because that means this service holding their login — see docs/hosted-app.md.
     ("twitter", "Twitter / X", "needs_account",
-     "Needs your own X account cookies. A shared server cannot hold them for you."),
+     "Possible on a server: twitter-cli works from exported X cookies. Not "
+     "offered here, because it would mean this service storing your X session — "
+     "which is equivalent to your password. The desktop tool does this on your "
+     "own machine instead."),
+    ("reddit", "Reddit", "needs_account",
+     "Possible on a server: rdt-cli works from a saved Reddit session cookie. "
+     "Not offered here, because it would mean storing your Reddit login on a "
+     "shared server."),
+    ("xiaohongshu", "小红书", "needs_account",
+     "Possible on a server: the xiaohongshu-mcp service works from an exported "
+     "cookie. Not offered here, because it would mean storing your 小红书 login "
+     "on a shared server."),
     ("xueqiu", "雪球 Xueqiu", "needs_account",
-     "Needs your own Xueqiu login cookie."),
+     "Possible on a server with your Xueqiu login cookie. Not offered here for "
+     "the same reason."),
     ("linkedin", "LinkedIn", "needs_account",
-     "Needs your own LinkedIn login."),
-    ("reddit", "Reddit", "unavailable",
-     "Reddit needs a signed-in browser session. The backend for it drives a "
-     "desktop Chrome window, which a server does not have."),
+     "Possible on a server with a signed-in LinkedIn session. Not offered here "
+     "for the same reason — and LinkedIn suspends accounts used this way."),
+
+    # No server-capable backend exists at all: reading these needs a desktop
+    # browser session, and storing a credential does not change that.
     ("facebook", "Facebook", "unavailable",
-     "Needs a signed-in desktop browser session, which a server cannot provide."),
+     "Agent Reach reads Facebook only through a signed-in desktop Chrome "
+     "window, which a server does not have. Meta's official API could be built "
+     "instead, but that needs a Business account and app review — a separate "
+     "project, not a setting."),
     ("instagram", "Instagram", "unavailable",
-     "Needs a signed-in desktop browser session, which a server cannot provide."),
-    ("xiaohongshu", "小红书", "unavailable",
-     "Needs a signed-in desktop browser session, which a server cannot provide."),
+     "Agent Reach reads Instagram only through a signed-in desktop Chrome "
+     "window, which a server does not have. Meta's official API could be built "
+     "instead, but that needs a Business account and app review — a separate "
+     "project, not a setting."),
 ]
 
 _status_cache: Optional[tuple] = None

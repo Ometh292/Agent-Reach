@@ -360,9 +360,11 @@
 const $ = (id) => document.getElementById(id);
 let sb = null, CONFIG = null;
 
+// Every label names a state, never an action. An earlier "Connect account"
+// read as a button for a flow that does not exist.
 const STATE_LABEL = {
   available: "Available", degraded: "Unreliable", disabled: "Not enabled",
-  needs_account: "Connect account", unavailable: "Not available",
+  needs_account: "Account required", unavailable: "Not available",
 };
 
 /* ─────────── boot ─────────── */
@@ -511,7 +513,7 @@ $("refreshQ").addEventListener("click", refreshQuotas);
 const GROUPS = [
   ["Available now", ["available", "degraded"]],
   ["Not enabled on this deployment", ["disabled"]],
-  ["Needs your own account", ["needs_account"]],
+  ["Not offered here — needs a personal account", ["needs_account"]],
   ["Cannot work in a hosted service", ["unavailable"]],
 ];
 
