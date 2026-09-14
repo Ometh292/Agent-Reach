@@ -53,8 +53,14 @@ class PlatformSpec:
     label: str
     #: Cookie names that must be present in the pasted export.
     required: tuple
-    #: Plain-language instructions shown in the UI.
-    how: str
+    #: The site the user signs in to.
+    site: str
+    #: Cookie domains accepted from a JSON export, so a paste taken from the
+    #: wrong tab is rejected with a clear reason instead of silently failing.
+    domains: tuple
+    #: Numbered steps shown in the UI. Written for someone who has never
+    #: installed a browser extension.
+    steps: tuple
     #: True when the credential is passed to a child process as environment
     #: variables; False when its tool insists on a file, which this design
     #: cannot satisfy without writing to disk.
@@ -66,22 +72,45 @@ SUPPORTED: Dict[str, PlatformSpec] = {
         id="twitter",
         label="Twitter / X",
         required=("auth_token", "ct0"),
-        how=(
-            "Install the Cookie-Editor extension, open x.com while signed in, "
-            "click the extension, choose Export → Header String, and paste it "
-            "below."
+        site="x.com",
+        domains=(".x.com", "x.com", ".twitter.com", "twitter.com"),
+        steps=(
+            "Add the free Cookie-Editor extension to your browser.",
+            "Open x.com in a new tab and make sure you are signed in.",
+            "Click the Cookie-Editor icon in your browser toolbar. "
+            "If you do not see it, click the puzzle-piece icon first.",
+            "At the bottom of the panel click Export, then choose "
+            "\u201cHeader String\u201d or \u201cJSON\u201d. Either works.",
+            "Come back here and paste it into the box below.",
         ),
     ),
     "xueqiu": PlatformSpec(
         id="xueqiu",
-        label="雪球 Xueqiu",
+        label="\u96ea\u7403 Xueqiu",
         required=("xq_a_token",),
-        how=(
-            "Install the Cookie-Editor extension, open xueqiu.com while signed "
-            "in, click the extension, choose Export → Header String, and paste "
-            "it below."
+        site="xueqiu.com",
+        domains=(".xueqiu.com", "xueqiu.com"),
+        steps=(
+            "Add the free Cookie-Editor extension to your browser.",
+            "Open xueqiu.com in a new tab and make sure you are signed in.",
+            "Click the Cookie-Editor icon in your browser toolbar. "
+            "If you do not see it, click the puzzle-piece icon first.",
+            "At the bottom of the panel click Export, then choose "
+            "\u201cHeader String\u201d or \u201cJSON\u201d. Either works.",
+            "Come back here and paste it into the box below.",
         ),
     ),
+}
+
+
+#: Where to get the extension, per browser. Chrome's listing also serves Edge,
+#: Brave and Opera, which all install from the Chrome Web Store.
+EXTENSION_LINKS = {
+    "Chrome, Edge, Brave or Opera":
+        "https://chromewebstore.google.com/detail/cookie-editor/"
+        "hlkenndednhfkekhgcdicdfddnkalmdm",
+    "Firefox":
+        "https://addons.mozilla.org/firefox/addon/cookie-editor/",
 }
 
 
@@ -97,21 +126,8 @@ class Entry:
                 or now - self.created > MAX_AGE_SECONDS)
 
 
-def parse_cookie_header(value: str, required: tuple) -> Dict[str, str]:
-    """Extract the needed cookies from a Cookie-Editor "Header String" export.
-
-    Only the named cookies are kept. Everything else in the paste — and a
-    browser export contains a great deal else — is discarded immediately rather
-    than held in memory for no reason.
-    """
-    if not isinstance(value, str):
-        raise CredentialError("Paste the exported cookie text.")
-    value = value.strip()
-    if not value:
-        raise CredentialError("Paste the exported cookie text.")
-    if len(value) > MAX_VALUE_CHARS:
-        raise CredentialError("That paste is too long to be a cookie export.")
-
+def _from_header_string(value: str) -> Dict[str, str]:
+    """Parse `name=value; name=value` — Cookie-Editor's "Header String"."""
     found: Dict[str, str] = {}
     for part in value.replace("\n", ";").split(";"):
         part = part.strip()
@@ -119,16 +135,99 @@ def parse_cookie_header(value: str, required: tuple) -> Dict[str, str]:
             continue
         name, _, cookie_value = part.partition("=")
         name, cookie_value = name.strip(), cookie_value.strip()
-        if name in required and cookie_value:
+        if name and cookie_value:
             found[name] = cookie_value
+    return found
 
-    missing = [name for name in required if name not in found]
-    if missing:
+
+def _from_json_export(value: str, domains: tuple) -> Optional[Dict[str, str]]:
+    """Parse Cookie-Editor's JSON export, or return None if it is not JSON.
+
+    Cookies from another site are dropped: a paste taken from the wrong tab
+    should fail with a clear reason rather than appear to work.
+    """
+    import json
+
+    stripped = value.lstrip()
+    if not stripped.startswith("["):
+        return None
+    try:
+        payload = json.loads(value)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, list):
+        return None
+
+    from agent_reach.utils.url import domain_matches
+
+    allowed = tuple(d.lstrip(".") for d in domains)
+    found: Dict[str, str] = {}
+    wrong_domain = 0
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        name, cookie_value = item.get("name"), item.get("value")
+        if not isinstance(name, str) or not isinstance(cookie_value, str):
+            continue
+        domain = item.get("domain")
+        if isinstance(domain, str) and domain and not domain_matches(domain, *allowed):
+            wrong_domain += 1
+            continue
+        if name and cookie_value:
+            found[name] = cookie_value
+    # Signal "this was a real export, just from the wrong site" so the caller
+    # can say that instead of "this does not look like a cookie export".
+    if not found and wrong_domain:
         raise CredentialError(
-            "That export does not contain " + " and ".join(missing)
-            + ". Make sure you are signed in, and use Export → Header String."
+            "That export came from a different website. Open the correct site "
+            "in a tab, then export from there."
         )
     return found
+
+
+def parse_cookie_export(value: str, required: tuple,
+                        domains: tuple = ()) -> Dict[str, str]:
+    """Extract the needed cookies from whichever export format was pasted.
+
+    Cookie-Editor offers several export formats and a non-technical user has
+    no way to know which one this wants, so accept both the header string and
+    the JSON array. Only the named cookies are kept; a browser export contains
+    a great deal else, and holding it would serve no purpose.
+    """
+    if not isinstance(value, str):
+        raise CredentialError("Paste the exported cookie text.")
+    value = value.strip()
+    if not value:
+        raise CredentialError("Paste the exported cookie text.")
+    if len(value) > MAX_VALUE_CHARS:
+        raise CredentialError(
+            "That paste is longer than expected. Use Export \u2192 Header String, "
+            "which is shorter than the full JSON."
+        )
+
+    parsed = _from_json_export(value, domains)
+    if parsed is None:
+        parsed = _from_header_string(value)
+
+    found = {name: parsed[name] for name in required if name in parsed}
+    missing = [name for name in required if name not in found]
+    if missing:
+        if not parsed:
+            raise CredentialError(
+                "That does not look like a cookie export. Use the Export button "
+                "at the bottom of the Cookie-Editor panel."
+            )
+        raise CredentialError(
+            "That export is missing " + " and ".join(missing)
+            + ". It usually means you were not signed in, or the export came "
+            "from a different tab. Open the site, check you are signed in, and "
+            "export again."
+        )
+    return found
+
+
+#: Retained under the old name so existing callers keep working.
+parse_cookie_header = parse_cookie_export
 
 
 class SessionCredentials:
@@ -153,7 +252,7 @@ class SessionCredentials:
         spec = SUPPORTED.get(platform)
         if spec is None:
             raise CredentialError("That platform cannot be connected here.")
-        values = parse_cookie_header(pasted, spec.required)
+        values = parse_cookie_export(pasted, spec.required, spec.domains)
 
         now = time.time()
         with self._lock:
@@ -235,7 +334,13 @@ class SessionCredentials:
 def catalogue() -> List[dict]:
     """What can be connected, for the UI. Contains no secrets."""
     return [
-        {"platform": spec.id, "label": spec.label, "how": spec.how,
-         "required": list(spec.required)}
+        {
+            "platform": spec.id,
+            "label": spec.label,
+            "site": spec.site,
+            "steps": list(spec.steps),
+            "required": list(spec.required),
+            "extensions": EXTENSION_LINKS,
+        }
         for spec in SUPPORTED.values()
     ]

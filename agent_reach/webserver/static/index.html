@@ -178,6 +178,23 @@
     background:var(--ok-bg);border:1px solid var(--ok);border-left-width:3px;
     border-radius:5px;padding:.6rem .75rem;margin:0 0 1rem}
   .privacy b{color:var(--ok)}
+  .steps-list{list-style:none;counter-reset:cstep;padding:0;margin:0 0 1rem;
+    display:grid;gap:.55rem}
+  .steps-list li{counter-increment:cstep;display:grid;grid-template-columns:1.5rem 1fr;
+    gap:.6rem;font-size:var(--s--1);line-height:1.5;color:var(--ink-soft)}
+  .steps-list li::before{content:counter(cstep);font-family:var(--mono);
+    font-size:.72rem;color:var(--accent-ink);background:var(--accent);
+    width:1.35rem;height:1.35rem;border-radius:50%;display:grid;place-items:center;
+    margin-top:.1rem}
+  .steps-list a{color:var(--accent)}
+  .ext{display:flex;flex-wrap:wrap;gap:.4rem;margin:.15rem 0 0}
+  .ext a{font-size:.72rem;background:var(--sunk);border:1px solid var(--rule);
+    border-radius:99px;padding:.15rem .6rem;text-decoration:none;color:var(--accent)}
+  .ext a:hover{border-color:var(--accent)}
+  .detect{font-family:var(--mono);font-size:.72rem;margin:.45rem 0 0;
+    display:flex;flex-wrap:wrap;gap:.5rem;min-height:1.1rem}
+  .detect span{display:inline-flex;gap:.3rem;align-items:center}
+  .detect .yes{color:var(--ok)} .detect .no{color:var(--ink-faint)}
   .sessionpill{font-family:var(--mono);font-size:.67rem;letter-spacing:.04em;
     text-transform:uppercase;color:var(--ok);background:var(--ok-bg);
     border:1px solid currentColor;border-radius:3px;padding:.15em .5em;white-space:nowrap}
@@ -388,11 +405,17 @@
       sign out, after an hour of inactivity, or whenever the service restarts.
       No part of it is ever shown back to you or to anyone else.
     </p>
-    <p class="how" id="dlgHow"></p>
-    <label for="dlgValue">Paste the exported cookie text
+
+    <p class="how" id="dlgIntro" style="margin-bottom:.5rem"></p>
+    <div class="ext" id="dlgExt"></div>
+    <ol class="steps-list" id="dlgSteps" style="margin-top:.9rem"></ol>
+
+    <label for="dlgValue">Paste it here
       <textarea id="dlgValue" spellcheck="false" autocomplete="off"
-                placeholder="name=value; name=value; ..."></textarea>
+                placeholder="Paste the export — either format works"></textarea>
     </label>
+    <div class="detect" id="dlgDetect"></div>
+
     <div class="msg bad" id="dlgErr" hidden role="alert"></div>
     <div class="acts">
       <button type="button" class="btn-q" id="dlgCancel">Cancel</button>
@@ -593,16 +616,69 @@ function openConnect(platform) {
   const spec = CONNECTABLE[platform];
   if (!spec) return;
   $("dlgTitle").textContent = "Connect " + spec.label;
-  $("dlgHow").textContent = spec.how;
+  $("dlgIntro").textContent =
+    "To read " + spec.label + " on your behalf, this needs the sign-in that your "
+    + "browser already holds for " + spec.site + ". Your password is never asked for.";
+
+  $("dlgExt").innerHTML = Object.entries(spec.extensions || {})
+    .map(([name, url]) =>
+      `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(name)} →</a>`)
+    .join("");
+
+  $("dlgSteps").innerHTML = (spec.steps || [])
+    .map((step) => `<li><span>${esc(step)}</span></li>`).join("");
+
   $("dlgValue").value = "";
   $("dlgErr").hidden = true;
+  renderDetection(platform, "");
   $("connectDlg").dataset.platform = platform;
   $("connectDlg").showModal();
   $("dlgValue").focus();
 }
 
+/** Show which required cookies the paste contains, before anything is sent.
+ *
+ * Parsed in the browser so the feedback is immediate and nothing leaves the
+ * page until Connect is pressed. Mirrors the server's accepted formats. */
+function detectCookies(text) {
+  const found = {};
+  const trimmed = (text || "").trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      JSON.parse(trimmed).forEach((item) => {
+        if (item && typeof item.name === "string" && typeof item.value === "string"
+            && item.value) found[item.name] = true;
+      });
+      return found;
+    } catch { /* fall through to header-string parsing */ }
+  }
+  trimmed.replace(/\n/g, ";").split(";").forEach((part) => {
+    const index = part.indexOf("=");
+    if (index > 0 && part.slice(index + 1).trim()) {
+      found[part.slice(0, index).trim()] = true;
+    }
+  });
+  return found;
+}
+
+function renderDetection(platform, text) {
+  const spec = CONNECTABLE[platform];
+  if (!spec) return;
+  if (!text.trim()) { $("dlgDetect").innerHTML = ""; return; }
+  const found = detectCookies(text);
+  $("dlgDetect").innerHTML = spec.required.map((name) => {
+    const got = Boolean(found[name]);
+    return `<span class="${got ? "yes" : "no"}">${got ? "✓" : "○"} ${esc(name)}</span>`;
+  }).join("") + (spec.required.every((n) => found[n])
+    ? ' <span class="yes">— looks right</span>' : "");
+}
+
+$("dlgValue").addEventListener("input", (event) =>
+  renderDetection($("connectDlg").dataset.platform, event.target.value));
+
 $("dlgCancel").addEventListener("click", () => {
   $("dlgValue").value = "";              // never leave a credential in the DOM
+  $("dlgDetect").innerHTML = "";
   $("connectDlg").close();
 });
 
@@ -621,6 +697,7 @@ $("dlgSave").addEventListener("click", async () => {
       method: "POST", body: JSON.stringify({ platform, value }),
     });
     $("dlgValue").value = "";            // clear before anything else can read it
+    $("dlgDetect").innerHTML = "";
     $("connectDlg").close();
     await loadConnections();
     loadChannels();

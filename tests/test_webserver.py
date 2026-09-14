@@ -553,3 +553,80 @@ def test_nothing_is_written_to_disk(tmp_path, monkeypatch):
     vault.connect("u", "twitter", TW_COOKIE)
     vault.get("u", "twitter")
     assert set(tmp_path.rglob("*")) == before
+
+
+# --------------------------------------------------------------------------- #
+# paste formats — a non-technical user cannot be expected to pick the right
+# export format, so accept whichever Cookie-Editor produced.
+# --------------------------------------------------------------------------- #
+
+from agent_reach.webserver.session_credentials import (  # noqa: E402
+    SUPPORTED,
+    catalogue,
+    parse_cookie_export,
+)
+
+TW_REQUIRED = ("auth_token", "ct0")
+TW_DOMAINS = (".x.com", "x.com")
+
+
+def test_accepts_header_string_export():
+    values = parse_cookie_export("guest_id=v1; auth_token=AAA; ct0=BBB",
+                                 TW_REQUIRED, TW_DOMAINS)
+    assert values == {"auth_token": "AAA", "ct0": "BBB"}
+
+
+def test_accepts_json_export():
+    payload = json.dumps([
+        {"name": "auth_token", "value": "AAA", "domain": ".x.com"},
+        {"name": "ct0", "value": "BBB", "domain": ".x.com"},
+        {"name": "unrelated", "value": "zz", "domain": ".x.com"},
+    ])
+    values = parse_cookie_export(payload, TW_REQUIRED, TW_DOMAINS)
+    assert values == {"auth_token": "AAA", "ct0": "BBB"}
+
+
+def test_accepts_a_multiline_paste():
+    values = parse_cookie_export("auth_token=AAA;\n  ct0=BBB;\n", TW_REQUIRED, TW_DOMAINS)
+    assert values == {"auth_token": "AAA", "ct0": "BBB"}
+
+
+def test_json_export_from_the_wrong_site_is_refused_with_that_reason():
+    payload = json.dumps([
+        {"name": "auth_token", "value": "AAA", "domain": ".evil.test"},
+        {"name": "ct0", "value": "BBB", "domain": ".evil.test"},
+    ])
+    with pytest.raises(CredentialError) as excinfo:
+        parse_cookie_export(payload, TW_REQUIRED, TW_DOMAINS)
+    assert "different website" in str(excinfo.value)
+
+
+def test_unparseable_paste_points_at_the_export_button():
+    with pytest.raises(CredentialError) as excinfo:
+        parse_cookie_export("hello there", TW_REQUIRED, TW_DOMAINS)
+    assert "Export" in str(excinfo.value)
+
+
+def test_signed_out_export_explains_the_likely_cause():
+    with pytest.raises(CredentialError) as excinfo:
+        parse_cookie_export("guest_id=v1; lang=en", TW_REQUIRED, TW_DOMAINS)
+    message = str(excinfo.value)
+    assert "auth_token" in message and "signed in" in message
+
+
+def test_catalogue_carries_guidance_and_no_secrets():
+    entries = {item["platform"]: item for item in catalogue()}
+    for platform, spec in SUPPORTED.items():
+        entry = entries[platform]
+        assert entry["site"] == spec.site
+        assert len(entry["steps"]) >= 4, platform
+        assert entry["extensions"], platform
+    blob = json.dumps(entries)
+    assert "auth_token=" not in blob      # instructions only, never a value
+
+
+def test_catalogue_is_reachable_through_the_api(client):
+    listing = client.get("/api/connections", headers=auth()).json()
+    twitter = next(i for i in listing["available"] if i["platform"] == "twitter")
+    assert twitter["site"] == "x.com"
+    assert any("Cookie-Editor" in step for step in twitter["steps"])
