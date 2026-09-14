@@ -1,0 +1,133 @@
+# Hosted client application
+
+A client-facing web app: sign in with Supabase, then search the web, read pages,
+pull YouTube details, and transcribe audio. No commands, no terminal.
+
+This is **separate from the local console** (`agent-reach ui`). That one runs on
+an operator's own machine, installs software and writes credentials, and binds
+loopback only. It must never be exposed. This application shares the channel
+implementations but exposes a read-only subset.
+
+```
+browser → Supabase auth → FastAPI (JWT verified) → Agent Reach → the internet
+```
+
+The local setup is the same architecture as production — the only difference is
+where the environment variables come from.
+
+## Running locally
+
+```bash
+pip install -e ".[server,dev]"
+
+export SUPABASE_URL="https://<ref>.supabase.co"
+export SUPABASE_ANON_KEY="<anon key>"
+export SUPABASE_JWT_SECRET="<jwt secret>"     # optional but faster
+
+uvicorn agent_reach.webserver.app:app --host 127.0.0.1 --port 8000
+```
+
+Open <http://localhost:8000>. The frontend is served by the backend — there is
+no separate build step and no Node toolchain.
+
+On Windows PowerShell, set variables with `$env:SUPABASE_URL = "…"`.
+
+## Supabase setup
+
+1. **Settings → API** — copy the Project URL, the `anon` key, and (optionally)
+   the JWT Secret.
+2. **Authentication → Sign In / Providers → Email** — enable it, and turn
+   **"Allow new users to sign up" OFF**. Create the client's accounts yourself
+   under Authentication → Users. Otherwise anyone on the internet can register
+   and spend your search and transcription quota.
+3. **Authentication → URL Configuration** — add your site URL.
+
+No database tables are required. Supabase is used only for authentication.
+
+## Environment variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `SUPABASE_URL` | Yes | Project URL |
+| `SUPABASE_ANON_KEY` | Yes | Public key, served to the browser |
+| `SUPABASE_JWT_SECRET` | No | Verifies sessions locally with no round-trip. Without it the server asks Supabase per new token, which also works |
+| `GITHUB_TOKEN` | No | Raises GitHub search from 60 to 5000 requests/hour |
+| `GROQ_API_KEY` | No | Enables Transcribe. Without it the tab is hidden |
+| `ALLOWED_ORIGINS` | No | Comma-separated origins for cross-origin access. Empty (default) means none |
+| `RATE_LIMIT_*` | No | `requests/seconds`, e.g. `RATE_LIMIT_SEARCH=60/3600` |
+| `HOST` / `PORT` | No | Bind address. Container hosts set `PORT` themselves |
+
+`SUPABASE_SERVICE_ROLE_KEY` is **not used** by this application. It bypasses Row
+Level Security; never put it in frontend code.
+
+## What works, and what cannot
+
+**Available** — needs nothing from the end user:
+
+| | |
+|---|---|
+| Web pages | Any public URL as clean text, via Jina Reader |
+| Web search | Exa, called over MCP-HTTP directly (no Node required) |
+| GitHub | Repository search over the REST API |
+| V2EX | Search, hot topics, threads with replies |
+| RSS / Atom | Any public feed |
+| YouTube | Details and subtitles — *unreliable*, see below |
+| Transcription | yt-dlp → ffmpeg → Whisper. Off unless a key is set |
+
+**Needs the end user's own account** — not offered, because a shared server
+would have to hold their credentials: **Twitter/X, 雪球, LinkedIn**.
+
+**Cannot work in a hosted service at all**: **Reddit, Facebook, Instagram,
+小红书**. These run through OpenCLI, which drives a logged-in desktop Chrome via
+a browser extension. A server has no desktop browser. This is a property of the
+platforms, not a missing feature — the Channels page says so plainly rather than
+implying they are merely unconfigured.
+
+**YouTube is marked "Unreliable" on purpose.** YouTube rate-limits datacenter
+IPs aggressively, so requests from any hosted provider fail intermittently. A
+residential proxy largely fixes it. Transcription inherits the same limitation.
+
+## Security
+
+**Sessions are verified server-side.** The API is reachable from the internet;
+protecting only the frontend would protect nothing, since anyone can call the
+endpoints with curl. Every `/api` route verifies the Supabase JWT — signature,
+expiry, and audience — before anything runs.
+
+**There is no command surface.** The browser names an operation from a fixed
+allowlist and the server builds every argument itself. `install`, `config.set`,
+`config.delete` and `skill` do not exist in this application. No `shell=True`
+anywhere.
+
+**URLs are checked before they are fetched.** A hosted server sits inside a
+provider's network where a link-local address reaches the instance metadata
+service, so every user-supplied URL goes through the same public-address
+validator the channels use. Loopback, private ranges, link-local, and non-HTTP
+schemes are rejected.
+
+**Rate limits are per user, per operation.** Each request spends the operator's
+quota, not the caller's. Transcription is deliberately much tighter than search.
+
+**Secrets stay server-side.** `/api/config` serves only the project URL and anon
+key. Errors are generic; stack traces are never returned. Command output passes
+through `scrub_url_credentials` before reaching the browser.
+
+**Job results are private.** Polling another user's job id returns the same 404
+as a job that does not exist, so ids cannot be probed.
+
+### Known limitation
+
+Rate limit state lives in the process. On one instance that is correct; if the
+service is scaled to several instances, each keeps its own counters and the
+effective limit multiplies by the instance count. Move it to Redis or Supabase
+before scaling out.
+
+## Testing
+
+```bash
+pytest tests/test_webserver.py -q      # 59 tests: auth, injection, SSRF, limits
+pytest tests/ -q                       # whole suite
+```
+
+The hosted tests use real HS256 tokens through the production verification path
+rather than patching authentication out.

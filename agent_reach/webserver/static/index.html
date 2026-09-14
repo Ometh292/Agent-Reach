@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Reach</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F5F7F9; --raised:#FFF; --sunk:#ECEFF3;
+    --ink:#171B22; --ink-soft:#414B5A; --ink-faint:#6E7887;
+    --rule:#D8DEE6; --rule-strong:#BCC5D0;
+    --accent:#1F5E8C; --accent-ink:#FFF; --accent-soft:#E3EDF5;
+    --ok:#2C6E49;  --ok-bg:#E4EFE8;
+    --warn:#8A5A12; --warn-bg:#F6EEDE;
+    --bad:#9B2C2C; --bad-bg:#F7E6E6;
+    --idle:#5A6270; --idle-bg:#E8EBEF;
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --serif:"Newsreader",ui-serif,Georgia,serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    --s--1:.8125rem; --s-0:1rem; --s-1:1.2rem; --s-2:1.45rem; --s-3:1.9rem; --s-4:2.4rem;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --paper:#12151A; --raised:#1A1F26; --sunk:#0D1014;
+    --ink:#E6EAF0; --ink-soft:#AEB8C6; --ink-faint:#7D8795;
+    --rule:#2A3140; --rule-strong:#3B4453;
+    --accent:#7FB2D8; --accent-ink:#0D1014; --accent-soft:#1B2A38;
+    --ok:#7DC49B; --ok-bg:#172A20;
+    --warn:#D9AE66; --warn-bg:#2B2415;
+    --bad:#E08585; --bad-bg:#2E1A1A;
+    --idle:#9AA3B1; --idle-bg:#1E232B;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#12151A; --raised:#1A1F26; --sunk:#0D1014;
+    --ink:#E6EAF0; --ink-soft:#AEB8C6; --ink-faint:#7D8795;
+    --rule:#2A3140; --rule-strong:#3B4453;
+    --accent:#7FB2D8; --accent-ink:#0D1014; --accent-soft:#1B2A38;
+    --ok:#7DC49B; --ok-bg:#172A20;
+    --warn:#D9AE66; --warn-bg:#2B2415;
+    --bad:#E08585; --bad-bg:#2E1A1A;
+    --idle:#9AA3B1; --idle-bg:#1E232B;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:var(--s-0);line-height:1.6;-webkit-font-smoothing:antialiased}
+  [hidden]{display:none!important}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+  /* ---------------- sign in ---------------- */
+  .gate{min-height:100vh;display:grid;place-items:center;padding:2.5rem 20px}
+  .gate-card{width:min(25rem,100%);background:var(--raised);border:1px solid var(--rule);
+    border-radius:8px;padding:2.2rem 1.9rem}
+  .mark{font-family:var(--mono);font-size:var(--s--1);letter-spacing:.12em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 .7rem}
+  .gate-card h1{font-family:var(--serif);font-weight:600;font-size:var(--s-4);
+    line-height:1.1;margin:0 0 .5rem}
+  .tagline{color:var(--ink-soft);font-size:var(--s--1);margin:0 0 1.7rem;line-height:1.55}
+
+  form{display:grid;gap:.9rem}
+  label{display:grid;gap:.3rem;font-size:var(--s--1);font-weight:500}
+  input,select,textarea{font:inherit;font-size:var(--s--1);color:var(--ink);
+    background:var(--paper);border:1px solid var(--rule-strong);border-radius:5px;
+    padding:.6rem .7rem;width:100%;max-width:100%}
+  input:focus,select:focus{border-color:var(--accent);outline:none;
+    box-shadow:0 0 0 3px var(--accent-soft)}
+  button{font:inherit;cursor:pointer;border-radius:5px;border:1px solid transparent}
+  .btn{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);
+    padding:.6rem 1.1rem;font-size:var(--s--1);font-weight:500}
+  .btn:hover:not(:disabled){filter:brightness(1.08)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-q{background:transparent;color:var(--ink-soft);border-color:var(--rule-strong);
+    padding:.45rem .85rem;font-size:var(--s--1)}
+  .btn-q:hover:not(:disabled){color:var(--ink);border-color:var(--ink-faint)}
+  .msg{font-size:var(--s--1);padding:.6rem .75rem;border-radius:5px;
+    border:1px solid currentColor;line-height:1.45}
+  .msg.bad{color:var(--bad);background:var(--bad-bg)}
+  .msg.ok{color:var(--ok);background:var(--ok-bg)}
+
+  /* ---------------- shell ---------------- */
+  .top{background:var(--raised);border-bottom:1px solid var(--rule);position:sticky;top:0;z-index:20}
+  .top-in{max-width:72rem;margin:0 auto;padding:.85rem 20px;display:flex;flex-wrap:wrap;
+    gap:1rem;align-items:center;justify-content:space-between}
+  .brand{font-family:var(--serif);font-weight:600;font-size:var(--s-2);margin:0}
+  .who{display:flex;gap:.75rem;align-items:center;font-size:var(--s--1);color:var(--ink-faint)}
+  .who .email{font-family:var(--mono)}
+  nav{background:var(--raised);border-bottom:1px solid var(--rule)}
+  .tabs{max-width:72rem;margin:0 auto;padding:0 20px;display:flex;gap:.2rem;overflow-x:auto}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;padding:.75rem .9rem;
+    font:inherit;font-size:var(--s--1);font-weight:500;color:var(--ink-faint);
+    cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+
+  main{max-width:72rem;margin:0 auto;padding:2rem 20px 5rem}
+  h2{font-family:var(--serif);font-weight:600;font-size:var(--s-2);margin:0 0 .2rem}
+  h3{font-size:var(--s-1);margin:0 0 .3rem}
+  .hint{color:var(--ink-soft);font-size:var(--s--1);margin:0 0 1.3rem;max-width:62ch}
+  .card{background:var(--raised);border:1px solid var(--rule);border-radius:7px;padding:1.2rem}
+  .cards{display:grid;gap:1rem}
+  .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end}
+  .row > label{flex:1 1 13rem;min-width:0}
+  .row > label.grow{flex:3 1 20rem}
+
+  .out{background:var(--sunk);border:1px solid var(--rule);border-radius:6px;
+    font-family:var(--mono);font-size:var(--s--1);line-height:1.55;padding:.9rem 1rem;
+    max-height:36rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;
+    margin-top:1rem;color:var(--ink)}
+  .out:empty{display:none}
+  .out .note{color:var(--ink-faint)}
+  .out .bad{color:var(--bad)}
+  .working{display:inline-flex;gap:.5rem;align-items:center;color:var(--ink-soft);
+    font-family:var(--mono);font-size:var(--s--1)}
+  .spin{width:.7rem;height:.7rem;border:2px solid var(--rule-strong);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+  .quota{font-family:var(--mono);font-size:.72rem;color:var(--ink-faint);margin-top:.6rem}
+  .examples{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.8rem}
+  .example{background:var(--sunk);border:1px solid var(--rule);border-radius:99px;
+    padding:.25rem .75rem;font-size:.75rem;color:var(--ink-soft);cursor:pointer}
+  .example:hover{color:var(--ink);border-color:var(--rule-strong)}
+
+  /* ---------------- dashboard ---------------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1px;
+    background:var(--rule);border:1px solid var(--rule);border-radius:7px;overflow:hidden;
+    margin-bottom:1.5rem}
+  .tile{background:var(--raised);padding:1rem 1.1rem}
+  .tile .n{font-family:var(--mono);font-size:var(--s-3);line-height:1;display:block;
+    font-variant-numeric:tabular-nums;margin-bottom:.3rem}
+  .tile .k{font-size:var(--s--1);color:var(--ink-soft);display:block;line-height:1.4}
+  .tile.ok .n{color:var(--ok)} .tile.warn .n{color:var(--warn)} .tile.idle .n{color:var(--idle)}
+  .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.7rem}
+  .quick button{background:var(--raised);border:1px solid var(--rule);border-radius:7px;
+    padding:1rem;text-align:left;display:grid;gap:.2rem}
+  .quick button:hover{border-color:var(--accent)}
+  .quick .t{font-weight:600;font-size:var(--s--1)}
+  .quick .d{font-size:.78rem;color:var(--ink-soft);line-height:1.4}
+
+  /* ---------------- channels ---------------- */
+  .chan{display:grid;grid-template-columns:1fr auto;gap:.5rem 1rem;align-items:start;
+    background:var(--raised);border:1px solid var(--rule);border-radius:6px;
+    padding:.85rem 1rem;border-left:3px solid var(--idle)}
+  .chan[data-s=available]{border-left-color:var(--ok)}
+  .chan[data-s=degraded]{border-left-color:var(--warn)}
+  .chan[data-s=disabled]{border-left-color:var(--idle)}
+  .chan[data-s=needs_account]{border-left-color:var(--warn)}
+  .chan[data-s=unavailable]{border-left-color:var(--bad)}
+  .chan .n{font-weight:600;font-size:var(--s--1)}
+  .chan .d{font-size:.78rem;color:var(--ink-soft);line-height:1.45;grid-column:1/-1;margin:0}
+  .pill{font-family:var(--mono);font-size:.67rem;font-weight:500;letter-spacing:.04em;
+    text-transform:uppercase;padding:.15em .5em;border-radius:3px;white-space:nowrap;
+    border:1px solid currentColor}
+  .pill.available{color:var(--ok);background:var(--ok-bg)}
+  .pill.degraded{color:var(--warn);background:var(--warn-bg)}
+  .pill.disabled{color:var(--idle);background:var(--idle-bg)}
+  .pill.needs_account{color:var(--warn);background:var(--warn-bg)}
+  .pill.unavailable{color:var(--bad);background:var(--bad-bg)}
+  .chan-group{display:grid;gap:.5rem;margin-bottom:1.8rem}
+  .group-h{font-family:var(--mono);font-size:.72rem;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--ink-faint);margin:0 0 .2rem}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:.45rem 1.2rem;font-size:var(--s--1)}
+  .kv dt{color:var(--ink-soft)} .kv dd{margin:0;font-family:var(--mono)}
+
+  footer{max-width:72rem;margin:0 auto;padding:0 20px 3rem;font-size:var(--s--1);
+    color:var(--ink-faint)}
+  footer p{max-width:62ch}
+
+  @media (max-width:34rem){
+    :root{--s-4:1.9rem;--s-2:1.25rem}
+    .top-in{flex-direction:column;align-items:flex-start;gap:.5rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════ /login ════════════ -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <p class="mark">Agent Reach</p>
+    <h1>Sign in</h1>
+    <p class="tagline">Search the web, read any page, and pull transcripts —
+      without juggling API keys.</p>
+    <form id="authForm">
+      <label for="email">Email
+        <input type="email" id="email" required autocomplete="email" placeholder="you@example.com">
+      </label>
+      <label for="password">Password
+        <input type="password" id="password" required autocomplete="current-password"
+               minlength="6" placeholder="Your password">
+      </label>
+      <button class="btn" id="authBtn" type="submit">Sign in</button>
+      <div class="msg bad" id="authErr" hidden role="alert"></div>
+    </form>
+    <p class="tagline" id="bootErr" style="margin:1.2rem 0 0" hidden></p>
+  </div>
+</div>
+
+<!-- ════════════ app ════════════ -->
+<div id="app" hidden>
+  <header class="top">
+    <div class="top-in">
+      <h1 class="brand">Agent Reach</h1>
+      <div class="who">
+        <span class="email" id="userEmail"></span>
+        <button class="btn-q" id="signOut" type="button">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <nav><div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-p="dashboard" aria-selected="true">Dashboard</button>
+    <button class="tab" role="tab" data-p="search" aria-selected="false">Search</button>
+    <button class="tab" role="tab" data-p="read" aria-selected="false">Web Reader</button>
+    <button class="tab" role="tab" data-p="youtube" aria-selected="false">YouTube</button>
+    <button class="tab" role="tab" data-p="transcribe" aria-selected="false" id="tabTr" hidden>Transcribe</button>
+    <button class="tab" role="tab" data-p="channels" aria-selected="false">Channels</button>
+    <button class="tab" role="tab" data-p="account" aria-selected="false">Account</button>
+  </div></nav>
+
+  <main>
+    <!-- /dashboard -->
+    <section id="p-dashboard" class="panel">
+      <h2 id="welcome">Welcome</h2>
+      <p class="hint">Everything below runs against live sources. Pick a task to begin.</p>
+      <div class="tiles" id="tiles"></div>
+      <div class="quick">
+        <button type="button" data-go="search"><span class="t">Search the internet</span>
+          <span class="d">Meaning-based web search, GitHub, V2EX</span></button>
+        <button type="button" data-go="read"><span class="t">Read a page</span>
+          <span class="d">Any address, as clean readable text</span></button>
+        <button type="button" data-go="youtube"><span class="t">Read a YouTube video</span>
+          <span class="d">Details and subtitles</span></button>
+        <button type="button" data-go="channels"><span class="t">Check what's available</span>
+          <span class="d">Live status of every source</span></button>
+      </div>
+    </section>
+
+    <!-- /search -->
+    <section id="p-search" class="panel" hidden>
+      <h2>Search</h2>
+      <p class="hint">Meaning-based web search, plus GitHub repositories and V2EX discussions.</p>
+      <div class="card">
+        <div class="row">
+          <label class="grow" for="q">Search the internet…
+            <input type="text" id="q" placeholder="e.g. how teams run incident reviews" autocomplete="off">
+          </label>
+          <label for="source">Source<select id="source"></select></label>
+          <label for="limit" style="flex:0 0 6rem">Results
+            <input type="text" id="limit" value="10" inputmode="numeric">
+          </label>
+          <button class="btn" id="goSearch">Search</button>
+        </div>
+        <div class="examples" id="examples"></div>
+        <div class="out" id="searchOut"></div>
+        <p class="quota" id="qSearch"></p>
+      </div>
+    </section>
+
+    <!-- /read -->
+    <section id="p-read" class="panel" hidden>
+      <h2>Web Reader</h2>
+      <p class="hint">Paste any address and get the readable text — no ads, no navigation.
+        RSS feeds return their latest items; V2EX threads return the post and its replies.</p>
+      <div class="card">
+        <div class="row">
+          <label class="grow" for="readUrl">Address
+            <input type="url" id="readUrl" placeholder="https://example.com/article" autocomplete="off">
+          </label>
+          <button class="btn" id="goRead">Read</button>
+        </div>
+        <div class="out" id="readOut"></div>
+        <p class="quota" id="qRead"></p>
+      </div>
+    </section>
+
+    <!-- /youtube -->
+    <section id="p-youtube" class="panel" hidden>
+      <h2>YouTube</h2>
+      <p class="hint">Video details and subtitles. YouTube limits requests from hosted
+        servers, so this can fail intermittently — that is a YouTube restriction, not a fault here.</p>
+      <div class="card">
+        <div class="row">
+          <label class="grow" for="ytUrl">Video address
+            <input type="url" id="ytUrl" placeholder="https://youtu.be/…" autocomplete="off">
+          </label>
+          <button class="btn" id="goYt">Read video</button>
+        </div>
+        <div class="out" id="ytOut"></div>
+        <p class="quota" id="qYoutube"></p>
+      </div>
+    </section>
+
+    <!-- /transcribe -->
+    <section id="p-transcribe" class="panel" hidden>
+      <h2>Transcribe</h2>
+      <p class="hint">Turn a video or podcast into text. A long recording takes several
+        minutes, and the hourly allowance is small.</p>
+      <div class="card">
+        <div class="row">
+          <label class="grow" for="trUrl">Video or podcast address
+            <input type="url" id="trUrl" placeholder="https://…" autocomplete="off">
+          </label>
+          <button class="btn" id="goTr">Transcribe</button>
+          <button class="btn-q" id="copyTr" disabled>Copy text</button>
+        </div>
+        <div class="out" id="trOut"></div>
+        <p class="quota" id="qTranscribe"></p>
+      </div>
+    </section>
+
+    <!-- /channels -->
+    <section id="p-channels" class="panel" hidden>
+      <h2>Channels</h2>
+      <p class="hint">Live status, checked against the real services. Nothing here is
+        assumed — a source is only marked available when it answered.</p>
+      <div class="row" style="margin-bottom:1.2rem">
+        <button class="btn" id="goChannels">Refresh</button>
+        <span id="chanSpin" hidden class="working"><span class="spin"></span>checking…</span>
+      </div>
+      <div id="channels"></div>
+    </section>
+
+    <!-- /account -->
+    <section id="p-account" class="panel" hidden>
+      <h2>Account</h2>
+      <p class="hint">Your session and current usage allowance.</p>
+      <div class="cards">
+        <div class="card">
+          <h3>Signed in as</h3>
+          <dl class="kv" id="acct"></dl>
+        </div>
+        <div class="card">
+          <h3>Remaining this hour</h3>
+          <p class="hint" style="margin-bottom:.8rem">Allowances refill gradually rather
+            than resetting on the hour.</p>
+          <dl class="kv" id="quotas"></dl>
+          <button class="btn-q" id="refreshQ" style="margin-top:.9rem">Refresh</button>
+        </div>
+        <div class="card">
+          <h3>Log out</h3>
+          <p class="hint" style="margin-bottom:.8rem">Ends this session in this browser.</p>
+          <button class="btn" id="signOut2" type="button">Log out</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Results come from public sources. What you search and read is not shared with
+      other people using this service.</p>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let sb = null, CONFIG = null;
+
+const STATE_LABEL = {
+  available: "Available", degraded: "Unreliable", disabled: "Not enabled",
+  needs_account: "Connect account", unavailable: "Not available",
+};
+
+/* ─────────── boot ─────────── */
+async function boot() {
+  try {
+    CONFIG = await (await fetch("/api/config")).json();
+  } catch {
+    return bootError("Cannot reach the server. Please try again shortly.");
+  }
+  if (!CONFIG.signInConfigured) {
+    return bootError("Sign-in is not configured on this deployment yet. "
+      + "Set SUPABASE_URL and SUPABASE_ANON_KEY.");
+  }
+  sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+  $("source").innerHTML = Object.entries(CONFIG.sources || {})
+    .map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join("");
+  if (CONFIG.transcription) $("tabTr").hidden = false;
+  renderExamples();
+
+  sb.auth.onAuthStateChange((_e, session) => {
+    if (session?.user) enterApp(session.user); else leaveApp();
+  });
+  const { data } = await sb.auth.getSession();
+  if (data.session?.user) enterApp(data.session.user);
+}
+function bootError(message) {
+  $("bootErr").textContent = message; $("bootErr").hidden = false;
+  $("authBtn").disabled = true;
+}
+
+/* ─────────── auth ─────────── */
+$("authForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("authErr").hidden = true;
+  const button = $("authBtn");
+  button.disabled = true; button.textContent = "Signing in…";
+  try {
+    const { error } = await sb.auth.signInWithPassword({
+      email: $("email").value.trim(), password: $("password").value,
+    });
+    if (error) throw error;
+  } catch (error) {
+    $("authErr").textContent = friendly(error); $("authErr").hidden = false;
+  } finally {
+    button.disabled = false; button.textContent = "Sign in";
+  }
+});
+function friendly(error) {
+  const raw = error?.message || "Something went wrong.";
+  if (/invalid login credentials/i.test(raw)) return "That email and password do not match an account.";
+  if (/email not confirmed/i.test(raw)) return "Confirm your email address first, then sign in.";
+  if (/failed to fetch|networkerror/i.test(raw)) return "Cannot reach the sign-in service.";
+  return raw;
+}
+const signOut = () => sb.auth.signOut();
+$("signOut").addEventListener("click", signOut);
+$("signOut2").addEventListener("click", signOut);
+
+function leaveApp(){ $("app").hidden = true; $("gate").hidden = false; $("password").value = ""; }
+async function enterApp(user) {
+  $("gate").hidden = true; $("app").hidden = false;
+  $("userEmail").textContent = user.email || "";
+  $("welcome").textContent = "Welcome" + (user.email ? ", " + user.email.split("@")[0] : "");
+  $("acct").innerHTML = `<dt>Email</dt><dd>${esc(user.email || "—")}</dd>`;
+  loadChannels(); refreshQuotas();
+}
+
+async function token() {
+  const { data } = await sb.auth.getSession();
+  if (!data.session) throw new Error("Your session has expired. Please sign in again.");
+  return data.session.access_token;
+}
+
+/* ─────────── api ─────────── */
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { "Content-Type": "application/json",
+               Authorization: `Bearer ${await token()}`, ...(options.headers || {}) },
+  });
+  const data = await response.json().catch(() => ({ error: "Unreadable response" }));
+  if (response.status === 401) { await sb.auth.signOut(); throw new Error(data.error || "Please sign in again."); }
+  if (!response.ok) throw new Error(data.error || `Failed (${response.status})`);
+  return data;
+}
+
+async function stream(operation, params, target, button) {
+  target.textContent = "";
+  if (button) button.disabled = true;
+  const spinner = document.createElement("span");
+  spinner.className = "working";
+  spinner.innerHTML = '<span class="spin"></span>working…';
+  target.appendChild(spinner);
+
+  let collected = "";
+  try {
+    const { job } = await api("/api/run", { method: "POST",
+      body: JSON.stringify({ operation, params }) });
+    let since = 0;
+    for (;;) {
+      const snap = await api(`/api/jobs/${job}?since=${since}`);
+      since = snap.next;
+      if (snap.lines.length) {
+        const chunk = snap.lines.join("\n") + "\n";
+        collected += chunk;
+        spinner.insertAdjacentText("beforebegin", chunk);
+        target.scrollTop = target.scrollHeight;
+      }
+      if (snap.status !== "running") {
+        spinner.remove();
+        const note = document.createElement("div");
+        if (snap.status === "error") { note.className = "bad"; note.textContent = "\n" + (snap.error || "Failed"); }
+        else { note.className = "note"; note.textContent = `\n— done in ${snap.elapsed}s`; }
+        target.appendChild(note);
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  } catch (error) {
+    spinner.remove();
+    const note = document.createElement("div");
+    note.className = "bad"; note.textContent = error.message;
+    target.appendChild(note);
+  } finally {
+    if (button) button.disabled = false;
+    refreshQuotas();
+  }
+  return collected;
+}
+
+async function refreshQuotas() {
+  try {
+    const me = await api("/api/me");
+    const rows = [];
+    for (const [name, left] of Object.entries(me.limits)) {
+      const box = $("q" + name.charAt(0).toUpperCase() + name.slice(1));
+      if (box) box.textContent = `${left} left this hour`;
+      rows.push(`<dt>${esc(name)}</dt><dd>${left}</dd>`);
+    }
+    $("quotas").innerHTML = rows.join("");
+  } catch { /* advisory only — never block the UI */ }
+}
+$("refreshQ").addEventListener("click", refreshQuotas);
+
+/* ─────────── channels ─────────── */
+const GROUPS = [
+  ["Available now", ["available", "degraded"]],
+  ["Not enabled on this deployment", ["disabled"]],
+  ["Needs your own account", ["needs_account"]],
+  ["Cannot work in a hosted service", ["unavailable"]],
+];
+
+async function loadChannels() {
+  $("chanSpin").hidden = false;
+  try {
+    const { channels } = await api("/api/status");
+    const counts = { ok: 0, warn: 0, no: 0 };
+    channels.forEach((c) => {
+      if (c.state === "available") counts.ok++;
+      else if (c.state === "degraded" || c.state === "needs_account") counts.warn++;
+      else counts.no++;
+    });
+    $("tiles").innerHTML = [
+      ["ok", counts.ok, "Ready to use"],
+      ["warn", counts.warn, "Limited or needs an account"],
+      ["idle", counts.no, "Not available here"],
+    ].map(([cls, n, k]) => `<div class="tile ${cls}"><span class="n">${n}</span><span class="k">${k}</span></div>`).join("");
+
+    $("channels").innerHTML = GROUPS.map(([heading, states]) => {
+      const members = channels.filter((c) => states.includes(c.state));
+      if (!members.length) return "";
+      return `<p class="group-h">${esc(heading)}</p><div class="chan-group">` +
+        members.map((c) => `<article class="chan" data-s="${esc(c.state)}">
+            <span class="n">${esc(c.label)}</span>
+            <span class="pill ${esc(c.state)}">${esc(STATE_LABEL[c.state] || c.state)}</span>
+            <p class="d">${esc(c.detail)}</p>
+          </article>`).join("") + `</div>`;
+    }).join("");
+  } catch (error) {
+    $("channels").innerHTML = `<p class="msg bad">${esc(error.message)}</p>`;
+  } finally {
+    $("chanSpin").hidden = true;
+  }
+}
+$("goChannels").addEventListener("click", loadChannels);
+
+/* ─────────── tabs + actions ─────────── */
+function showPanel(name) {
+  document.querySelectorAll(".tab").forEach((t) =>
+    t.setAttribute("aria-selected", String(t.dataset.p === name)));
+  document.querySelectorAll(".panel").forEach((p) => { p.hidden = true; });
+  $("p-" + name).hidden = false;
+}
+document.querySelectorAll(".tab").forEach((tab) =>
+  tab.addEventListener("click", () => showPanel(tab.dataset.p)));
+document.querySelectorAll(".quick button").forEach((b) =>
+  b.addEventListener("click", () => showPanel(b.dataset.go)));
+
+const EXAMPLES = ["how teams run incident reviews", "local-first software", "postgres index tuning"];
+function renderExamples() {
+  $("examples").innerHTML = EXAMPLES
+    .map((t) => `<button class="example" type="button">${esc(t)}</button>`).join("");
+  $("examples").querySelectorAll(".example").forEach((chip) =>
+    chip.addEventListener("click", () => { $("q").value = chip.textContent; $("goSearch").click(); }));
+}
+
+$("goSearch").addEventListener("click", () => {
+  const query = $("q").value.trim();
+  if (!query) { $("searchOut").textContent = "Type something to search for."; return; }
+  stream("search", { platform: $("source").value, query, limit: Number($("limit").value) || 10 },
+         $("searchOut"), $("goSearch"));
+});
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goSearch").click(); });
+
+$("goRead").addEventListener("click", () => {
+  const url = $("readUrl").value.trim();
+  if (!url) { $("readOut").textContent = "Paste an address first."; return; }
+  stream("read", { url }, $("readOut"), $("goRead"));
+});
+$("readUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goRead").click(); });
+
+$("goYt").addEventListener("click", () => {
+  const url = $("ytUrl").value.trim();
+  if (!url) { $("ytOut").textContent = "Paste a YouTube address first."; return; }
+  stream("youtube", { url }, $("ytOut"), $("goYt"));
+});
+$("ytUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("goYt").click(); });
+
+let transcript = "";
+$("goTr").addEventListener("click", async () => {
+  const url = $("trUrl").value.trim();
+  if (!url) { $("trOut").textContent = "Paste an address first."; return; }
+  $("copyTr").disabled = true;
+  transcript = await stream("transcribe", { url }, $("trOut"), $("goTr"));
+  $("copyTr").disabled = !transcript.trim();
+});
+$("copyTr").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(transcript.trim()); $("copyTr").textContent = "Copied"; }
+  catch { $("copyTr").textContent = "Copy failed"; }
+  setTimeout(() => { $("copyTr").textContent = "Copy text"; }, 1600);
+});
+
+function esc(v) {
+  return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+boot();
+</script>
+</body>
+</html>
