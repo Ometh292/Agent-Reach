@@ -274,7 +274,14 @@
     color:var(--ink);padding:0;max-width:34rem;width:calc(100% - 2rem)}
   dialog::backdrop{background:rgba(10,12,16,.55)}
   .dlg{padding:1.4rem 1.5rem}
-  .dlg h3{font-family:var(--serif);font-size:var(--s-2);font-weight:600;margin:0 0 .4rem}
+  .dlg h3{font-family:var(--serif);font-size:var(--s-2);font-weight:600;margin:0}
+  .dlg-h{position:sticky;top:0;z-index:1;background:var(--raised);
+    margin:-1.4rem -1.5rem 1.1rem;padding:1.4rem 1.5rem .85rem;
+    display:flex;gap:1rem;align-items:flex-start;justify-content:space-between;
+    border-bottom:1px solid var(--rule)}
+  .dlg-x{background:transparent;border:1px solid transparent;color:var(--ink-faint);
+    font-size:1.4rem;line-height:1;padding:.1rem .5rem .25rem;flex:0 0 auto}
+  .dlg-x:hover{color:var(--ink);border-color:var(--rule-strong)}
   .dlg .how{font-size:var(--s--1);color:var(--ink-soft);line-height:1.55;margin:0 0 1rem}
   .dlg textarea{font-family:var(--mono);font-size:.78rem;min-height:6.5rem;
     resize:vertical;line-height:1.5;width:100%}
@@ -502,7 +509,10 @@
 
 <dialog id="connectDlg">
   <form method="dialog" class="dlg" id="connectForm">
-    <h3 id="dlgTitle">Connect account</h3>
+    <div class="dlg-h">
+      <h3 id="dlgTitle">Connect account</h3>
+      <button type="button" class="dlg-x" id="dlgClose" aria-label="Close">×</button>
+    </div>
     <p class="privacy">
       <b>Held for this session only.</b> What you paste stays in the server's
       memory, is never written to disk or any database, and is forgotten when you
@@ -1348,11 +1358,23 @@ function renderDetection(platform, text) {
 $("dlgValue").addEventListener("input", (event) =>
   renderDetection($("connectDlg").dataset.platform, event.target.value));
 
-$("dlgCancel").addEventListener("click", () => {
-  $("dlgValue").value = "";              // never leave a credential in the DOM
+/** Never leave a credential in the DOM once the dialog is done with. */
+function clearConnect() {
+  $("dlgValue").value = "";
   $("dlgDetect").innerHTML = "";
+  $("dlgErr").hidden = true;
+}
+function closeConnect() {
+  clearConnect();                        // synchronously, before the dialog goes
   $("connectDlg").close();
-});
+}
+$("dlgCancel").addEventListener("click", closeConnect);
+$("dlgClose").addEventListener("click", closeConnect);
+// Escape and the backdrop close a <dialog> without going through the buttons.
+// "cancel" fires synchronously on Escape, before the dialog goes; "close" is
+// queued, so it is the catch-all rather than the guarantee.
+$("connectDlg").addEventListener("cancel", clearConnect);
+$("connectDlg").addEventListener("close", clearConnect);
 
 $("dlgSave").addEventListener("click", async () => {
   const platform = $("connectDlg").dataset.platform;
@@ -1368,9 +1390,7 @@ $("dlgSave").addEventListener("click", async () => {
     await api("/api/connections", {
       method: "POST", body: JSON.stringify({ platform, value }),
     });
-    $("dlgValue").value = "";            // clear before anything else can read it
-    $("dlgDetect").innerHTML = "";
-    $("connectDlg").close();
+    $("connectDlg").close();             // the close handler clears the paste
     await loadConnections();
     loadChannels();
     rebuildSourceList();
