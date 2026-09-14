@@ -424,7 +424,7 @@ def _cmd_install(args):
 
         # Final status
         print()
-        print(format_report(results))
+        _print_report(format_report(results))
         print()
 
         if safe_mode:
@@ -952,13 +952,60 @@ def _install_xiaoyuzhou_deps():
     return script_ok and ffmpeg_ok
 
 
+def _tool_shim_dirs() -> list:
+    """Directories where pipx/uv place CLI shims.
+
+    A long-running shell does not pick up a newly added bin directory, so
+    these must be searched explicitly — see _find_installed_tool().
+    """
+    import os
+    import sys
+
+    dirs = []
+    for env_name in ("PIPX_BIN_DIR", "UV_TOOL_BIN_DIR"):
+        configured = os.environ.get(env_name)
+        if configured:
+            dirs.append(os.path.expanduser(configured))
+    dirs.append(os.path.join(os.path.expanduser("~"), ".local", "bin"))
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            dirs.append(os.path.join(local_app_data, "Programs", "Python", "Scripts"))
+    return dirs
+
+
+def _find_installed_tool(command: str):
+    """Locate a CLI shim even when PATH has not been refreshed in this process.
+
+    pipx and uv install shims into a bin directory that the *running* process
+    may not have on PATH (pipx's default ~/.local/bin on Windows is the common
+    case). shutil.which() alone therefore reports a perfectly successful
+    install as a failure, which previously made `install --channels` print
+    "twitter-cli install failed" for an installed, working 0.8.5 and then exit
+    non-zero. Fall back to the known shim directories before giving up.
+    """
+    import os
+    import shutil
+
+    found = shutil.which(command)
+    if found:
+        return found
+    extensions = (".exe", ".cmd", ".bat", "") if os.name == "nt" else ("",)
+    for directory in _tool_shim_dirs():
+        for extension in extensions:
+            candidate = os.path.join(directory, command + extension)
+            if os.path.isfile(candidate):
+                return candidate
+    return None
+
+
 def _install_twitter_deps():
     """Install twitter-cli for Twitter search + timeline."""
     import shutil
     import subprocess
 
     print("Setting up Twitter (twitter-cli)...")
-    if shutil.which("twitter"):
+    if _find_installed_tool("twitter"):
         print("  ✅ twitter-cli already installed")
         return True
     for tool, args in [
@@ -972,7 +1019,7 @@ def _install_twitter_deps():
                     [tool_cmd, *args], capture_output=True, encoding="utf-8",
                     errors="replace", timeout=120,
                 )
-                if result.returncode == 0 and shutil.which("twitter"):
+                if result.returncode == 0 and _find_installed_tool("twitter"):
                     print("  ✅ twitter-cli installed")
                     return True
             except (OSError, subprocess.TimeoutExpired):
@@ -1077,8 +1124,7 @@ def _install_reddit_deps():
     if _detect_environment() != "server":
         installed = _install_opencli_deps()
         print("  Reddit 走 OpenCLI（浏览器里登录过 reddit.com 即可用）")
-        import shutil
-        if shutil.which("rdt"):
+        if _find_installed_tool("rdt"):
             print("  ✅ 检测到存量 rdt-cli，将作为备选后端继续可用")
         return installed
 
@@ -1091,7 +1137,7 @@ def _install_rdt_cli():
     import subprocess
 
     print("Setting up Reddit (rdt-cli)...")
-    if shutil.which("rdt"):
+    if _find_installed_tool("rdt"):
         print("  ✅ rdt-cli already installed")
         return True
     for tool, args in [
@@ -1105,7 +1151,7 @@ def _install_rdt_cli():
                     [tool_cmd, *args], capture_output=True, encoding="utf-8",
                     errors="replace", timeout=120,
                 )
-                if result.returncode == 0 and shutil.which("rdt"):
+                if result.returncode == 0 and _find_installed_tool("rdt"):
                     print("  ✅ rdt-cli installed")
                     return True
             except (OSError, subprocess.TimeoutExpired):
@@ -1120,7 +1166,7 @@ def _install_bili_deps():
     import subprocess
 
     print("Setting up Bilibili (bili-cli)...")
-    if shutil.which("bili"):
+    if _find_installed_tool("bili"):
         print("  ✅ bili-cli already installed")
         return True
     for tool, args in [
@@ -1134,7 +1180,7 @@ def _install_bili_deps():
                     [tool_cmd, *args], capture_output=True, encoding="utf-8",
                     errors="replace", timeout=120,
                 )
-                if result.returncode == 0 and shutil.which("bili"):
+                if result.returncode == 0 and _find_installed_tool("bili"):
                     print("  ✅ bili-cli installed")
                     return True
             except (OSError, subprocess.TimeoutExpired):
@@ -1969,6 +2015,21 @@ def _cmd_uninstall(args):
     print("  npm uninstall -g undici")
 
 
+def _print_report(report: str) -> None:
+    """Render a Rich-markup report, degrading to plain text without Rich.
+
+    format_report() returns Rich markup, so it must never reach a bare
+    print() — `install` used to do exactly that and printed literal
+    "[bold cyan]" / "[green]" tags to the user.
+    """
+    try:
+        from rich import print as rich_print
+    except ImportError:
+        print(report)
+    else:
+        rich_print(report)
+
+
 def _cmd_doctor(args=None):
     from agent_reach.config import Config
     from agent_reach.doctor import check_all, format_report
@@ -1979,13 +2040,7 @@ def _cmd_doctor(args=None):
         print(json.dumps(results, ensure_ascii=False, indent=2))
         return
 
-    report = format_report(results)
-    try:
-        from rich import print as rich_print
-    except ImportError:
-        print(report)
-    else:
-        rich_print(report)
+    _print_report(format_report(results))
 
 
 def _cmd_setup():
