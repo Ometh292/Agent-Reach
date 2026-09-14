@@ -87,6 +87,71 @@ implying they are merely unconfigured.
 IPs aggressively, so requests from any hosted provider fail intermittently. A
 residential proxy largely fixes it. Transcription inherits the same limitation.
 
+## Connecting your own account (session-only)
+
+Some platforms only serve content to someone signed in. Rather than storing
+those logins, this application holds them **in memory, for one session, and
+never writes them anywhere**.
+
+On the Channels page, a supported platform shows a **Connect** button. Paste a
+Cookie-Editor "Header String" export and it becomes available as a search
+source until you sign out.
+
+| Platform | What is needed |
+|---|---|
+| Twitter / X | `auth_token` and `ct0` from x.com |
+| 雪球 Xueqiu | `xq_a_token` from xueqiu.com |
+
+Twitter search additionally needs `twitter-cli` present in the image
+(`pipx install twitter-cli`); without it the platform reports that it is not
+installed rather than failing obscurely.
+
+### What the guarantee is
+
+* Held in this process's memory only. Never written to disk, never to a
+  database, never logged.
+* Forgotten on sign-out, after an hour idle, after eight hours regardless, and
+  on every restart or redeploy.
+* Only the cookies the tool needs are kept; the rest of the paste is discarded
+  immediately.
+* No endpoint returns a credential. `/api/connections` reports *which*
+  platforms are connected and never *with what*.
+* Passed to tools through the environment, never as command arguments, so it
+  cannot appear in the host's process list.
+* One user's credential can never serve another's request. Xueqiu keeps its
+  cookie jar in module state, so those calls are serialised and the jar is
+  cleared before and after each one.
+
+### What it is not
+
+Say this plainly to users rather than implying more safety than exists:
+
+* **It is in memory while in use.** Anyone who can read the process — a host
+  operator, a crash dump, a debugger — can read it. This is a large reduction
+  in risk, not elimination.
+* **Python strings cannot be reliably wiped.** A disconnected credential may
+  linger in freed memory until the allocator reuses it.
+* **It crosses the network to reach the server.** Never run this over plain
+  HTTP; TLS is doing real work here.
+* **The platform may still object.** X and LinkedIn forbid automated access and
+  suspend accounts used this way. That risk belongs to the account holder and
+  should be stated before they connect.
+
+### Platforms not offered this way, and why
+
+**Reddit** and **小红书** can run on a server, but their tools read credentials
+from a *file* (`~/.config/rdt-cli/credential.json`, and a cookie file for the
+xiaohongshu-mcp service). Supporting them session-only means writing that file
+for the duration of a call — which contradicts the guarantee above unless it is
+written to memory-backed storage such as `/dev/shm`, which exists on Linux but
+not on every host. They are left out until that is designed deliberately rather
+than bolted on.
+
+**LinkedIn** runs its own interactive login and persists credentials itself, so
+this application cannot promise anything about their lifetime.
+
+**Facebook** and **Instagram** have no server-capable backend at all.
+
 ## Security
 
 **Sessions are verified server-side.** The API is reachable from the internet;

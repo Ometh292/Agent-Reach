@@ -157,6 +157,30 @@
   .pill.disabled{color:var(--idle);background:var(--idle-bg)}
   .pill.needs_account{color:var(--warn);background:var(--warn-bg)}
   .pill.unavailable{color:var(--bad);background:var(--bad-bg)}
+  .chan .act{display:flex;gap:.5rem;align-items:center}
+  .connect{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);
+    padding:.28rem .7rem;font-size:.72rem;font-weight:500;border-radius:4px}
+  .connect:hover{filter:brightness(1.08)}
+  .disconnect{background:transparent;color:var(--ink-soft);
+    border:1px solid var(--rule-strong);padding:.26rem .65rem;font-size:.72rem;
+    border-radius:4px}
+  .disconnect:hover{color:var(--bad);border-color:var(--bad)}
+  dialog{border:1px solid var(--rule);border-radius:8px;background:var(--raised);
+    color:var(--ink);padding:0;max-width:34rem;width:calc(100% - 2rem)}
+  dialog::backdrop{background:rgba(10,12,16,.55)}
+  .dlg{padding:1.4rem 1.5rem}
+  .dlg h3{font-family:var(--serif);font-size:var(--s-2);font-weight:600;margin:0 0 .4rem}
+  .dlg .how{font-size:var(--s--1);color:var(--ink-soft);line-height:1.55;margin:0 0 1rem}
+  .dlg textarea{font-family:var(--mono);font-size:.78rem;min-height:6.5rem;
+    resize:vertical;line-height:1.5;width:100%}
+  .dlg .acts{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem}
+  .privacy{font-size:.75rem;line-height:1.5;color:var(--ink-soft);
+    background:var(--ok-bg);border:1px solid var(--ok);border-left-width:3px;
+    border-radius:5px;padding:.6rem .75rem;margin:0 0 1rem}
+  .privacy b{color:var(--ok)}
+  .sessionpill{font-family:var(--mono);font-size:.67rem;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--ok);background:var(--ok-bg);
+    border:1px solid currentColor;border-radius:3px;padding:.15em .5em;white-space:nowrap}
   .chan-group{display:grid;gap:.5rem;margin-bottom:1.8rem}
   .group-h{font-family:var(--mono);font-size:.72rem;letter-spacing:.07em;
     text-transform:uppercase;color:var(--ink-faint);margin:0 0 .2rem}
@@ -354,6 +378,29 @@
   </footer>
 </div>
 
+
+<dialog id="connectDlg">
+  <form method="dialog" class="dlg" id="connectForm">
+    <h3 id="dlgTitle">Connect account</h3>
+    <p class="privacy">
+      <b>Held for this session only.</b> What you paste stays in the server's
+      memory, is never written to disk or any database, and is forgotten when you
+      sign out, after an hour of inactivity, or whenever the service restarts.
+      No part of it is ever shown back to you or to anyone else.
+    </p>
+    <p class="how" id="dlgHow"></p>
+    <label for="dlgValue">Paste the exported cookie text
+      <textarea id="dlgValue" spellcheck="false" autocomplete="off"
+                placeholder="name=value; name=value; ..."></textarea>
+    </label>
+    <div class="msg bad" id="dlgErr" hidden role="alert"></div>
+    <div class="acts">
+      <button type="button" class="btn-q" id="dlgCancel">Cancel</button>
+      <button type="button" class="btn" id="dlgSave">Connect</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 "use strict";
@@ -379,8 +426,6 @@ async function boot() {
       + "Set SUPABASE_URL and SUPABASE_ANON_KEY.");
   }
   sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
-  $("source").innerHTML = Object.entries(CONFIG.sources || {})
-    .map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join("");
   if (CONFIG.transcription) $("tabTr").hidden = false;
   renderExamples();
 
@@ -419,7 +464,13 @@ function friendly(error) {
   if (/failed to fetch|networkerror/i.test(raw)) return "Cannot reach the sign-in service.";
   return raw;
 }
-const signOut = () => sb.auth.signOut();
+async function signOut() {
+  // Drop any connected credential server-side before the session ends, rather
+  // than leaving it to expire on its own.
+  try { await api("/api/connections/clear", { method: "POST" }); } catch { /* going anyway */ }
+  CONNECTED = {};
+  await sb.auth.signOut();
+}
 $("signOut").addEventListener("click", signOut);
 $("signOut2").addEventListener("click", signOut);
 
@@ -429,6 +480,8 @@ async function enterApp(user) {
   $("userEmail").textContent = user.email || "";
   $("welcome").textContent = "Welcome" + (user.email ? ", " + user.email.split("@")[0] : "");
   $("acct").innerHTML = `<dt>Email</dt><dd>${esc(user.email || "—")}</dd>`;
+  await loadConnections();
+  rebuildSourceList();
   loadChannels(); refreshQuotas();
 }
 
@@ -447,6 +500,10 @@ async function api(path, options = {}) {
   });
   const data = await response.json().catch(() => ({ error: "Unreadable response" }));
   if (response.status === 401) { await sb.auth.signOut(); throw new Error(data.error || "Please sign in again."); }
+  if (response.status === 409) {
+    const platform = response.headers.get("X-Connect-Platform");
+    if (platform && CONNECTABLE[platform]) openConnect(platform);
+  }
   if (!response.ok) throw new Error(data.error || `Failed (${response.status})`);
   return data;
 }
@@ -513,9 +570,95 @@ $("refreshQ").addEventListener("click", refreshQuotas);
 const GROUPS = [
   ["Available now", ["available", "degraded"]],
   ["Not enabled on this deployment", ["disabled"]],
-  ["Not offered here — needs a personal account", ["needs_account"]],
+  ["Connect your own account", ["needs_account"]],
   ["Cannot work in a hosted service", ["unavailable"]],
 ];
+
+// Platforms this deployment can actually accept a session credential for.
+// Anything else in "needs_account" is explained but not connectable.
+let CONNECTABLE = {};      // platform -> {label, how, required}
+let CONNECTED = {};        // platform -> {expires_in}
+
+async function loadConnections() {
+  try {
+    const data = await api("/api/connections");
+    CONNECTABLE = {};
+    (data.available || []).forEach((item) => { CONNECTABLE[item.platform] = item; });
+    CONNECTED = {};
+    (data.connected || []).forEach((item) => { CONNECTED[item.platform] = item; });
+  } catch { /* listing is advisory; the page still renders */ }
+}
+
+function openConnect(platform) {
+  const spec = CONNECTABLE[platform];
+  if (!spec) return;
+  $("dlgTitle").textContent = "Connect " + spec.label;
+  $("dlgHow").textContent = spec.how;
+  $("dlgValue").value = "";
+  $("dlgErr").hidden = true;
+  $("connectDlg").dataset.platform = platform;
+  $("connectDlg").showModal();
+  $("dlgValue").focus();
+}
+
+$("dlgCancel").addEventListener("click", () => {
+  $("dlgValue").value = "";              // never leave a credential in the DOM
+  $("connectDlg").close();
+});
+
+$("dlgSave").addEventListener("click", async () => {
+  const platform = $("connectDlg").dataset.platform;
+  const value = $("dlgValue").value;
+  $("dlgErr").hidden = true;
+  if (!value.trim()) {
+    $("dlgErr").textContent = "Paste the exported cookie text first.";
+    $("dlgErr").hidden = false;
+    return;
+  }
+  $("dlgSave").disabled = true;
+  try {
+    await api("/api/connections", {
+      method: "POST", body: JSON.stringify({ platform, value }),
+    });
+    $("dlgValue").value = "";            // clear before anything else can read it
+    $("connectDlg").close();
+    await loadConnections();
+    loadChannels();
+    rebuildSourceList();
+  } catch (error) {
+    $("dlgErr").textContent = error.message;
+    $("dlgErr").hidden = false;
+  } finally {
+    $("dlgSave").disabled = false;
+  }
+});
+
+async function disconnectPlatform(platform) {
+  try {
+    await api(`/api/connections/${encodeURIComponent(platform)}`, { method: "DELETE" });
+    await loadConnections();
+    loadChannels();
+    rebuildSourceList();
+  } catch (error) {
+    $("channels").insertAdjacentHTML("afterbegin",
+      `<p class="msg bad">${esc(error.message)}</p>`);
+  }
+}
+
+/** Search sources = always-available ones, plus any connected this session. */
+function rebuildSourceList() {
+  const options = Object.entries(CONFIG.sources || {})
+    .map(([id, label]) => `<option value="${id}">${esc(label)}</option>`);
+  Object.entries(CONFIG.connectedSources || {}).forEach(([id, label]) => {
+    const on = Boolean(CONNECTED[id]);
+    options.push(
+      `<option value="${id}"${on ? "" : " disabled"}>` +
+      `${esc(label)}${on ? "" : " — connect first"}</option>`);
+  });
+  const previous = $("source").value;
+  $("source").innerHTML = options.join("");
+  if (previous) $("source").value = previous;
+}
 
 async function loadChannels() {
   $("chanSpin").hidden = false;
@@ -537,12 +680,30 @@ async function loadChannels() {
       const members = channels.filter((c) => states.includes(c.state));
       if (!members.length) return "";
       return `<p class="group-h">${esc(heading)}</p><div class="chan-group">` +
-        members.map((c) => `<article class="chan" data-s="${esc(c.state)}">
+        members.map((c) => {
+          const connectable = Boolean(CONNECTABLE[c.id]);
+          const live = CONNECTED[c.id];
+          let action;
+          if (live) {
+            const mins = Math.max(1, Math.round(live.expires_in / 60));
+            action = `<span class="sessionpill">connected · ${mins}m</span>` +
+                     `<button class="disconnect" type="button" data-off="${esc(c.id)}">Disconnect</button>`;
+          } else if (connectable) {
+            action = `<button class="connect" type="button" data-on="${esc(c.id)}">Connect</button>`;
+          } else {
+            action = `<span class="pill ${esc(c.state)}">${esc(STATE_LABEL[c.state] || c.state)}</span>`;
+          }
+          return `<article class="chan" data-s="${esc(c.state)}">
             <span class="n">${esc(c.label)}</span>
-            <span class="pill ${esc(c.state)}">${esc(STATE_LABEL[c.state] || c.state)}</span>
+            <span class="act">${action}</span>
             <p class="d">${esc(c.detail)}</p>
-          </article>`).join("") + `</div>`;
+          </article>`;
+        }).join("") + `</div>`;
     }).join("");
+    $("channels").querySelectorAll("[data-on]").forEach((b) =>
+      b.addEventListener("click", () => openConnect(b.dataset.on)));
+    $("channels").querySelectorAll("[data-off]").forEach((b) =>
+      b.addEventListener("click", () => disconnectPlatform(b.dataset.off)));
   } catch (error) {
     $("channels").innerHTML = `<p class="msg bad">${esc(error.message)}</p>`;
   } finally {

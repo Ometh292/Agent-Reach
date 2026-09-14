@@ -25,6 +25,10 @@ from agent_reach import __version__
 from agent_reach.webserver import hosted_ops as ops
 from agent_reach.webserver.auth import AuthError, User
 from agent_reach.webserver.rate_limit import RateLimited
+from agent_reach.webserver.session_credentials import (
+    CredentialError,
+    catalogue,
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -113,6 +117,15 @@ async def run_job(job: Job, stream) -> None:
 # auth helper
 # --------------------------------------------------------------------------- #
 
+def _context_for(request: Request, user: User) -> ops.Context:
+    """Bind operations to this caller's own credentials, and no one else's."""
+    vault = request.app.state.credentials
+    return ops.Context(
+        user_id=user.id,
+        credentials=lambda platform: vault.get(user.id, platform),
+    )
+
+
 def _user(request: Request, authorization: Optional[str]) -> User:
     verifier = request.app.state.verifier
     if verifier is None:
@@ -157,6 +170,9 @@ async def client_config(request: Request) -> JSONResponse:
         "version": __version__,
         "operations": ops.available_operations(),
         "sources": {key: label for key, (label, _) in ops.SEARCH_PLATFORMS.items()},
+        "connectedSources": {
+            key: label for key, (label, _) in ops.CONNECTED_PLATFORMS.items()
+        },
         "transcription": ops.transcription_enabled(),
         "signInConfigured": bool(settings.supabase_url and settings.supabase_anon_key),
     })
@@ -219,15 +235,25 @@ async def run(request: Request, authorization: Optional[str] = Header(None)) -> 
             return JSONResponse({"error": str(exc)}, status_code=429,
                                 headers={"Retry-After": str(exc.retry_after)})
         try:
-            return JSONResponse({"result": await asyncio.to_thread(handler, params)})
+            result = await asyncio.to_thread(handler, params, _context_for(request, user))
+            return JSONResponse({"result": result})
         except ops.HostedError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Validate before charging the allowance: the handler checks its parameters
     # eagerly and returns the stream, so a malformed request fails here with a
     # 400 instead of creating a job and spending a token.
+    context = _context_for(request, user)
     try:
-        stream = await asyncio.to_thread(handler, params)
+        stream = await asyncio.to_thread(handler, params, context)
+    except ops.NeedsConnection as exc:
+        # 409, not 400: the request is well formed, the account is simply not
+        # connected. The UI uses this to open the connect panel.
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+            headers={"X-Connect-Platform": exc.platform},
+        ) from exc
     except ops.HostedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -257,3 +283,78 @@ async def job_status(
     if job is None or job.user_id != user.id:
         raise HTTPException(status_code=404, detail="That result is no longer available.")
     return JSONResponse(job.view(max(0, since)))
+
+
+# --------------------------------------------------------------------------- #
+# session-only credentials
+# --------------------------------------------------------------------------- #
+
+@router.get("/api/connections")
+async def list_connections(
+    request: Request, authorization: Optional[str] = Header(None),
+) -> JSONResponse:
+    """What this caller has connected, and what can be connected.
+
+    Returns no credential material. There is deliberately no endpoint in this
+    application that reads a stored credential back out.
+    """
+    user = _user(request, authorization)
+    return JSONResponse({
+        "connected": request.app.state.credentials.connected(user.id),
+        "available": catalogue(),
+    })
+
+
+@router.post("/api/connections")
+async def connect(
+    request: Request, authorization: Optional[str] = Header(None),
+) -> JSONResponse:
+    """Accept a pasted cookie export and hold it for this session only."""
+    user = _user(request, authorization)
+
+    raw = await request.body()
+    if len(raw) > MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="That paste is too large.")
+    try:
+        import json as _json
+        body = _json.loads(raw or b"{}")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Malformed request.") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Malformed request.")
+
+    platform = body.get("platform")
+    pasted = body.get("value")
+    if not isinstance(platform, str) or not isinstance(pasted, str):
+        raise HTTPException(status_code=400, detail="Malformed request.")
+
+    try:
+        request.app.state.credentials.connect(user.id, platform, pasted)
+    except CredentialError as exc:
+        # The message describes what was missing, never what was pasted.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return JSONResponse({
+        "connected": request.app.state.credentials.connected(user.id),
+    })
+
+
+@router.delete("/api/connections/{platform}")
+async def disconnect(
+    platform: str, request: Request, authorization: Optional[str] = Header(None),
+) -> JSONResponse:
+    user = _user(request, authorization)
+    request.app.state.credentials.disconnect(user.id, platform)
+    return JSONResponse({
+        "connected": request.app.state.credentials.connected(user.id),
+    })
+
+
+@router.post("/api/connections/clear")
+async def clear_connections(
+    request: Request, authorization: Optional[str] = Header(None),
+) -> JSONResponse:
+    """Called on sign-out so a credential never outlives the session."""
+    user = _user(request, authorization)
+    removed = request.app.state.credentials.disconnect_all(user.id)
+    return JSONResponse({"cleared": removed})

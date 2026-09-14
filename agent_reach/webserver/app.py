@@ -36,6 +36,7 @@ from agent_reach import __version__
 from agent_reach.webserver.auth import SupabaseVerifier
 from agent_reach.webserver.rate_limit import RateLimiter, budgets_from_env
 from agent_reach.webserver.routes import router
+from agent_reach.webserver.session_credentials import SessionCredentials
 
 
 def _load_dotenv_if_present() -> None:
@@ -97,6 +98,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     application.state.settings = settings
     application.state.limiter = RateLimiter(budgets_from_env())
+    # In-memory only. Never written to disk or a database; a restart
+    # deliberately loses every connected session.
+    application.state.credentials = SessionCredentials()
 
     # Built once at startup so a misconfiguration surfaces as a clear 503 from
     # /api/config rather than an import-time crash that takes the whole service

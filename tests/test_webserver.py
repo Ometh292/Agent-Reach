@@ -383,3 +383,173 @@ def test_transcription_hidden_without_a_key(monkeypatch):
     assert "transcribe" not in ops.available_operations()
     with pytest.raises(ops.HostedError):
         ops.get_operation("transcribe")
+
+
+# --------------------------------------------------------------------------- #
+# session-only credentials
+#
+# The promise is narrow and testable: a credential lives in memory, for one
+# user, for a bounded time, and no endpoint ever reads it back out.
+# --------------------------------------------------------------------------- #
+
+from agent_reach.webserver.session_credentials import (  # noqa: E402
+    IDLE_TTL_SECONDS,
+    MAX_PER_USER,
+    CredentialError,
+    SessionCredentials,
+    parse_cookie_header,
+)
+
+TW_COOKIE = "guest_id=v1%3A17; auth_token=abc123def; ct0=ff00ff; lang=en"
+
+
+def test_parses_only_the_required_cookies():
+    """A browser export contains a lot; keep only what the tool needs."""
+    values = parse_cookie_header(TW_COOKIE, ("auth_token", "ct0"))
+    assert values == {"auth_token": "abc123def", "ct0": "ff00ff"}
+    assert "guest_id" not in values
+
+
+def test_rejects_an_export_missing_a_required_cookie():
+    with pytest.raises(CredentialError) as excinfo:
+        parse_cookie_header("auth_token=only", ("auth_token", "ct0"))
+    assert "ct0" in str(excinfo.value)
+
+
+def test_rejects_an_oversized_paste():
+    with pytest.raises(CredentialError):
+        parse_cookie_header("a=" + "x" * 20000, ("a",))
+
+
+def test_credentials_are_isolated_between_users():
+    vault = SessionCredentials()
+    vault.connect("user-A", "twitter", TW_COOKIE)
+    assert vault.get("user-A", "twitter")["auth_token"] == "abc123def"
+    assert vault.get("user-B", "twitter") is None
+
+
+def test_disconnect_removes_the_credential():
+    vault = SessionCredentials()
+    vault.connect("u", "twitter", TW_COOKIE)
+    assert vault.disconnect("u", "twitter") is True
+    assert vault.get("u", "twitter") is None
+
+
+def test_sign_out_clears_everything_for_that_user():
+    vault = SessionCredentials()
+    vault.connect("u", "twitter", TW_COOKIE)
+    vault.connect("u", "xueqiu", "xq_a_token=tok")
+    assert vault.disconnect_all("u") == 2
+    assert vault.connected("u") == []
+
+
+def test_credentials_expire_when_idle(monkeypatch):
+    vault = SessionCredentials()
+    vault.connect("u", "twitter", TW_COOKIE)
+
+    real = __import__("time").time
+    monkeypatch.setattr("agent_reach.webserver.session_credentials.time.time",
+                        lambda: real() + IDLE_TTL_SECONDS + 10)
+    assert vault.get("u", "twitter") is None
+
+
+def test_connected_listing_never_contains_a_credential():
+    """The listing tells the UI what is connected, never with what."""
+    vault = SessionCredentials()
+    vault.connect("u", "twitter", TW_COOKIE)
+    blob = json.dumps(vault.connected("u"))
+    assert "abc123def" not in blob
+    assert "ff00ff" not in blob
+    assert "twitter" in blob
+
+
+def test_per_user_platform_count_is_bounded():
+    vault = SessionCredentials()
+    for index in range(MAX_PER_USER):
+        vault._store.setdefault("u", {})[f"p{index}"] = vault.__class__ and __import__(
+            "agent_reach.webserver.session_credentials", fromlist=["Entry"]
+        ).Entry(values={"k": "v"})
+    with pytest.raises(CredentialError):
+        vault.connect("u", "twitter", TW_COOKIE)
+
+
+def test_unknown_platform_cannot_be_connected():
+    vault = SessionCredentials()
+    with pytest.raises(CredentialError):
+        vault.connect("u", "facebook", "a=b")
+
+
+# ---- through the API ------------------------------------------------------ #
+
+def test_connections_require_auth(client):
+    assert client.get("/api/connections").status_code == 401
+    assert client.post("/api/connections",
+                       json={"platform": "twitter", "value": TW_COOKIE}).status_code == 401
+
+
+def test_connect_then_list_then_disconnect(client):
+    response = client.post("/api/connections", headers=auth(),
+                           json={"platform": "twitter", "value": TW_COOKIE})
+    assert response.status_code == 200
+    assert [c["platform"] for c in response.json()["connected"]] == ["twitter"]
+
+    listing = client.get("/api/connections", headers=auth()).json()
+    assert [c["platform"] for c in listing["connected"]] == ["twitter"]
+    # available catalogue must carry instructions but no secrets
+    assert any(item["platform"] == "twitter" for item in listing["available"])
+
+    removed = client.delete("/api/connections/twitter", headers=auth())
+    assert removed.json()["connected"] == []
+
+
+def test_api_never_returns_the_credential(client):
+    client.post("/api/connections", headers=auth(),
+                json={"platform": "twitter", "value": TW_COOKIE})
+    for path in ("/api/connections", "/api/me", "/api/config"):
+        body = client.get(path, headers=auth()).text
+        assert "abc123def" not in body, path
+        assert "ff00ff" not in body, path
+
+
+def test_connecting_rejects_a_bad_paste_without_echoing_it(client):
+    secret = "SUPERSECRETVALUE"
+    response = client.post("/api/connections", headers=auth(),
+                           json={"platform": "twitter", "value": f"wrong={secret}"})
+    assert response.status_code == 400
+    assert secret not in response.text
+
+
+def test_search_on_a_connected_platform_asks_to_connect_first(client):
+    """Well-formed but not connected: 409, naming the platform for the UI."""
+    response = client.post("/api/run", headers=auth(),
+                           json={"operation": "search",
+                                 "params": {"platform": "twitter", "query": "x"}})
+    assert response.status_code == 409
+    assert response.headers.get("X-Connect-Platform") == "twitter"
+
+
+def test_one_users_connection_does_not_serve_another(client):
+    """The cross-user leak this design exists to prevent."""
+    client.post("/api/connections", headers=auth(make_token(sub="user-A")),
+                json={"platform": "twitter", "value": TW_COOKIE})
+    response = client.post(
+        "/api/run", headers=auth(make_token(sub="user-B", email="b@example.com")),
+        json={"operation": "search", "params": {"platform": "twitter", "query": "x"}})
+    assert response.status_code == 409
+
+
+def test_clear_endpoint_drops_everything(client):
+    client.post("/api/connections", headers=auth(),
+                json={"platform": "twitter", "value": TW_COOKIE})
+    assert client.post("/api/connections/clear", headers=auth()).json()["cleared"] == 1
+    assert client.get("/api/connections", headers=auth()).json()["connected"] == []
+
+
+def test_nothing_is_written_to_disk(tmp_path, monkeypatch):
+    """The whole promise: no file appears anywhere as a result of connecting."""
+    monkeypatch.chdir(tmp_path)
+    before = set(tmp_path.rglob("*"))
+    vault = SessionCredentials()
+    vault.connect("u", "twitter", TW_COOKIE)
+    vault.get("u", "twitter")
+    assert set(tmp_path.rglob("*")) == before

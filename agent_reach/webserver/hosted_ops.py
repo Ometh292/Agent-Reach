@@ -25,7 +25,8 @@ import shutil
 import subprocess
 import threading
 import time
-from typing import Dict, Iterator, List, Optional
+from dataclasses import dataclass
+from typing import Callable, Dict, Iterator, List, Optional
 
 from agent_reach.utils.process import utf8_subprocess_env
 from agent_reach.utils.text import scrub_url_credentials
@@ -33,12 +34,43 @@ from agent_reach.webserver import exa
 
 #: Caps that bound a single operation's cost.
 MAX_RESULT_LINES = 4000
+SEARCH_TIMEOUT = 180
 YT_TIMEOUT = 120
 STATUS_CACHE_SECONDS = 60
 
 
 class HostedError(RuntimeError):
     """A user-facing failure, shown verbatim in the UI."""
+
+
+class NeedsConnection(HostedError):
+    """The caller must connect their own account for this platform first."""
+
+    def __init__(self, platform: str, label: str):
+        super().__init__(
+            "Connect your " + label + " account to use this. It is held for "
+            "this session only and is never stored."
+        )
+        self.platform = platform
+
+
+@dataclass(frozen=True)
+class Context:
+    """Who is asking, and how to reach their session-only credentials.
+
+    Passed explicitly rather than through a global or a thread local, because
+    a credential reaching the wrong request is precisely the failure this
+    design exists to prevent.
+    """
+
+    user_id: str = ""
+    credentials: Optional[Callable[[str], Optional[Dict[str, str]]]] = None
+
+    def require(self, platform: str, label: str) -> Dict[str, str]:
+        values = self.credentials(platform) if self.credentials else None
+        if not values:
+            raise NeedsConnection(platform, label)
+        return values
 
 
 # --------------------------------------------------------------------------- #
@@ -143,14 +175,123 @@ def _search_v2ex(query: str, limit: int) -> Iterator[str]:
         yield json.dumps(item, ensure_ascii=False)
 
 
+def _stream_process(argv, timeout, env_extra=None):
+    """Run argv and yield its output lines.
+
+    argv is always a list, never a shell string. Credentials go through the
+    environment, never through arguments, so they cannot show up in a process
+    listing on the host.
+    """
+    env = utf8_subprocess_env()
+    if env_extra:
+        env.update(env_extra)
+    try:
+        proc = subprocess.Popen(
+            argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            encoding="utf-8", errors="replace", env=env,
+        )
+    except OSError as exc:
+        raise HostedError("Could not start that tool: " + str(exc)) from exc
+
+    produced = 0
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            line = scrub_url_credentials(line.rstrip("\n"))
+            produced += len(line)
+            if produced > 512 * 1024:
+                proc.kill()
+                yield "... output truncated"
+                break
+            yield line
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise HostedError("That took too long and was stopped.") from None
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+    if proc.returncode not in (0, None):
+        raise HostedError(
+            "That platform returned an error. Your connected session may have "
+            "expired - try reconnecting the account."
+        )
+
+
+def _search_twitter(query, limit, ctx):
+    """Search X with the caller's own session, held in memory only."""
+    creds = ctx.require("twitter", "Twitter / X")
+    twitter = shutil.which("twitter")
+    if not twitter:
+        raise HostedError("Twitter support is not installed on this deployment.")
+    return _stream_process(
+        [twitter, "search", query, "-n", str(limit)], SEARCH_TIMEOUT,
+        {"TWITTER_AUTH_TOKEN": creds["auth_token"], "TWITTER_CT0": creds["ct0"]},
+    )
+
+
+#: Serialises Xueqiu calls. That channel keeps its cookie jar in module-level
+#: state, so without this lock one user's session would serve another user's
+#: request - a cross-user credential leak.
+_xueqiu_lock = threading.Lock()
+
+
+def _search_xueqiu(query, limit, ctx):
+    creds = ctx.require("xueqiu", "Xueqiu")
+    cookie = "; ".join(k + "=" + v for k, v in creds.items())
+    return _xueqiu_call(lambda channel: channel.search_stock(query, limit=limit), cookie)
+
+
+def _xueqiu_call(action, cookie):
+    """Run one Xueqiu call with only this caller's cookie loaded.
+
+    The jar is cleared before and after, under a lock, so a credential can
+    never survive into the next request.
+    """
+    from agent_reach.channels import xueqiu as xq
+    from agent_reach.channels.xueqiu import XueqiuChannel
+
+    with _xueqiu_lock:
+        xq._cookie_jar.clear()
+        xq._cookies_initialized = False
+        try:
+            xq._inject_cookie_string(cookie)
+            xq._cookies_initialized = True
+            try:
+                results = action(XueqiuChannel())
+            except Exception as exc:
+                raise HostedError(
+                    "Xueqiu request failed: " + scrub_url_credentials(exc)
+                ) from exc
+        finally:
+            xq._cookie_jar.clear()
+            xq._cookies_initialized = False
+
+    for item in results:
+        yield json.dumps(item, ensure_ascii=False)
+
+
+#: Sources that need nothing at all from the caller.
 SEARCH_PLATFORMS: Dict[str, tuple] = {
     "exa":    ("Web search", _search_exa),
     "github": ("GitHub", _search_github),
     "v2ex":   ("V2EX", _search_v2ex),
 }
 
+#: Sources that need the caller's own session, supplied for this session only
+#: and never written anywhere. See session_credentials.py.
+CONNECTED_PLATFORMS: Dict[str, tuple] = {
+    "twitter": ("Twitter / X", _search_twitter),
+    "xueqiu":  ("Xueqiu", _search_xueqiu),
+}
 
-def op_search(params: dict) -> Iterator[str]:
+ALL_SEARCH_LABELS = dict(
+    [(k, v[0]) for k, v in SEARCH_PLATFORMS.items()]
+    + [(k, v[0]) for k, v in CONNECTED_PLATFORMS.items()]
+)
+
+
+def op_search(params: dict, ctx=None) -> Iterator[str]:
     """Validate eagerly, then return the stream.
 
     A generator body does not run until it is first advanced, so validating
@@ -158,18 +299,20 @@ def op_search(params: dict) -> Iterator[str]:
     token before failing. Everything below raises before any work starts.
     """
     platform = params.get("platform")
-    if platform not in SEARCH_PLATFORMS:
-        raise HostedError("Choose one of the available sources.")
     query = _text(params, "query")
     limit = _count(params, "limit", 10, 1, 25)
-    return SEARCH_PLATFORMS[platform][1](query, limit)
+    if platform in SEARCH_PLATFORMS:
+        return SEARCH_PLATFORMS[platform][1](query, limit)
+    if platform in CONNECTED_PLATFORMS:
+        return CONNECTED_PLATFORMS[platform][1](query, limit, ctx or Context())
+    raise HostedError("Choose one of the available sources.")
 
 
 # --------------------------------------------------------------------------- #
 # read / browse
 # --------------------------------------------------------------------------- #
 
-def op_read(params: dict) -> Iterator[str]:
+def op_read(params: dict, ctx=None) -> Iterator[str]:
     """Read a page as clean text, routed by whichever channel claims the URL."""
     return _read_stream(_public_url(params))
 
@@ -212,7 +355,7 @@ def _read_stream(url: str) -> Iterator[str]:
         yield line
 
 
-def op_browse(params: dict) -> Iterator[str]:
+def op_browse(params: dict, ctx=None) -> Iterator[str]:
     feed = params.get("feed")
     if feed != "v2ex_hot":
         raise HostedError("Choose one of the available feeds.")
@@ -241,7 +384,7 @@ def _yt_dlp_path() -> str:
     return found
 
 
-def op_youtube(params: dict) -> Iterator[str]:
+def op_youtube(params: dict, ctx=None) -> Iterator[str]:
     """Video details plus subtitles, via the same yt-dlp the channel uses."""
     from agent_reach.channels.youtube import YouTubeChannel
 
@@ -293,7 +436,7 @@ def transcription_enabled() -> bool:
     return has_key and bool(shutil.which("ffmpeg")) and bool(shutil.which("yt-dlp"))
 
 
-def op_transcribe(params: dict) -> Iterator[str]:
+def op_transcribe(params: dict, ctx=None) -> Iterator[str]:
     if not transcription_enabled():
         raise HostedError("Transcription is not enabled on this deployment.")
     return _transcribe_stream(_public_url(params))
@@ -452,7 +595,7 @@ def compute_status() -> List[dict]:
     return channels
 
 
-def op_status(params: dict) -> dict:
+def op_status(params: dict, ctx=None) -> dict:
     """Channel availability, cached briefly so the page is cheap to refresh."""
     global _status_cache
     with _status_lock:
