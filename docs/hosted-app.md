@@ -74,14 +74,16 @@ Level Security; never put it in frontend code.
 | YouTube | Details and subtitles — *unreliable*, see below |
 | Transcription | yt-dlp → ffmpeg → Whisper. Off unless a key is set |
 
-**Needs the end user's own account** — not offered, because a shared server
-would have to hold their credentials: **Twitter/X, 雪球, LinkedIn**.
+**Needs the end user's own account.** **Twitter/X** and **雪球** can be
+connected for the duration of a session — see the next section. **Reddit**,
+**小红书** and **LinkedIn** could also run on a server, but are not offered
+here; the reasons are given below.
 
-**Cannot work in a hosted service at all**: **Reddit, Facebook, Instagram,
-小红书**. These run through OpenCLI, which drives a logged-in desktop Chrome via
-a browser extension. A server has no desktop browser. This is a property of the
-platforms, not a missing feature — the Channels page says so plainly rather than
-implying they are merely unconfigured.
+**Cannot work in a hosted service at all**: **Facebook** and **Instagram**.
+Their only backend drives a signed-in desktop Chrome window through a browser
+extension, and a server has no desktop browser. Meta's official APIs could be
+built instead, but that is a separate project behind app review. The Channels
+page says this plainly rather than implying they are merely unconfigured.
 
 **YouTube is marked "Unreliable" on purpose.** YouTube rate-limits datacenter
 IPs aggressively, so requests from any hosted provider fail intermittently. A
