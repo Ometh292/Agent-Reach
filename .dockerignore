@@ -1,0 +1,41 @@
+# Keep secrets and local state out of the build context entirely — anything
+# copied into an image can be read back out of it by anyone who pulls it.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.git
+.github
+.gitignore
+
+# Local caches and build output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+uv.lock
+
+# Not needed at runtime: the image serves the hosted app only.
+tests/
+scripts/
+frontend/
+docs/
+config/
+.openteams/
+.claude/
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+CLAUDE.md
+llms.txt
+test.sh
+HANDOVER.md
+connecting-accounts.*
