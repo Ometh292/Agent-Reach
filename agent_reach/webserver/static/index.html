@@ -546,6 +546,11 @@ let sb = null, CONFIG = null;
 
 // Every label names a state, never an action. An earlier "Connect account"
 // read as a button for a flow that does not exist.
+//: Channels this deployment does not show. The API still returns them — this
+//: hides them in the UI only, in the channel list, in the search sources, and
+//: as something that can be connected. Remove an id here to bring one back.
+const HIDDEN_CHANNELS = new Set(["xiaohongshu", "xueqiu"]);
+
 const STATE_LABEL = {
   available: "Available", degraded: "Unreliable", disabled: "Not enabled",
   needs_account: "Account required", unavailable: "Not available",
@@ -1288,7 +1293,9 @@ async function loadConnections() {
   try {
     const data = await api("/api/connections");
     CONNECTABLE = {};
-    (data.available || []).forEach((item) => { CONNECTABLE[item.platform] = item; });
+    (data.available || []).forEach((item) => {
+      if (!HIDDEN_CHANNELS.has(item.platform)) CONNECTABLE[item.platform] = item;
+    });
     CONNECTED = {};
     (data.connected || []).forEach((item) => { CONNECTED[item.platform] = item; });
   } catch { /* listing is advisory; the page still renders */ }
@@ -1417,8 +1424,10 @@ async function disconnectPlatform(platform) {
 /** Search sources = always-available ones, plus any connected this session. */
 function rebuildSourceList() {
   const options = Object.entries(CONFIG.sources || {})
+    .filter(([id]) => !HIDDEN_CHANNELS.has(id))
     .map(([id, label]) => `<option value="${id}">${esc(label)}</option>`);
   Object.entries(CONFIG.connectedSources || {}).forEach(([id, label]) => {
+    if (HIDDEN_CHANNELS.has(id)) return;
     const on = Boolean(CONNECTED[id]);
     options.push(
       `<option value="${id}"${on ? "" : " disabled"}>` +
@@ -1432,7 +1441,8 @@ function rebuildSourceList() {
 async function loadChannels() {
   $("chanSpin").hidden = false;
   try {
-    const { channels } = await api("/api/status");
+    const all = (await api("/api/status")).channels;
+    const channels = all.filter((c) => !HIDDEN_CHANNELS.has(c.id));
     const counts = { ok: 0, warn: 0, no: 0 };
     channels.forEach((c) => {
       if (c.state === "available") counts.ok++;
